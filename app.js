@@ -7,7 +7,8 @@ const state = {
   catalog: [],
   dashboard: null,
   loading: false,
-  saving: false
+  saving: false,
+  mobileSlideIndex: 0
 };
 
 const elements = {
@@ -24,6 +25,13 @@ const elements = {
   lastTradingBadge: document.getElementById("last-trading-badge"),
   tableHead: document.getElementById("table-head"),
   tableBody: document.getElementById("table-body"),
+  mobileCompare: document.getElementById("mobile-compare"),
+  mobileCompareControls: document.getElementById("mobile-compare-controls"),
+  mobilePrevButton: document.getElementById("mobile-prev-button"),
+  mobileNextButton: document.getElementById("mobile-next-button"),
+  mobileCompareCount: document.getElementById("mobile-compare-count"),
+  mobileCompareTrack: document.getElementById("mobile-compare-track"),
+  mobileCompareDots: document.getElementById("mobile-compare-dots"),
   emptyState: document.getElementById("empty-state"),
   tickerList: document.getElementById("ticker-list")
 };
@@ -299,6 +307,115 @@ function renderTable(payload) {
   elements.emptyState.classList.toggle("is-visible", rows.length === 0);
 }
 
+function getMobileCompareEntries(slots) {
+  const benchmarkIndex = slots.findIndex((slot) => slot.editable === false);
+  const safeBenchmarkIndex = benchmarkIndex >= 0 ? benchmarkIndex : 0;
+  const benchmarkSlot = slots[safeBenchmarkIndex];
+  const compareEntries = slots
+    .map((slot, index) => ({ slot, index }))
+    .filter((entry) => entry.index !== safeBenchmarkIndex);
+
+  return { benchmarkSlot, benchmarkIndex: safeBenchmarkIndex, compareEntries };
+}
+
+function updateMobileCompareNavigation(totalSlides) {
+  const hasSlides = totalSlides > 0;
+  const hasMultiple = totalSlides > 1;
+  elements.mobileCompare.hidden = !hasSlides;
+  elements.mobileCompareControls.hidden = !hasMultiple;
+  elements.mobileCompareDots.hidden = !hasMultiple;
+
+  if (!hasSlides) {
+    elements.mobileCompareCount.textContent = "";
+    elements.mobileCompareDots.innerHTML = "";
+    return;
+  }
+
+  elements.mobileCompareCount.textContent = `${state.mobileSlideIndex + 1} / ${totalSlides}`;
+  elements.mobilePrevButton.disabled = !hasMultiple || state.mobileSlideIndex === 0;
+  elements.mobileNextButton.disabled = !hasMultiple || state.mobileSlideIndex >= totalSlides - 1;
+
+  elements.mobileCompareDots.innerHTML = Array.from({ length: totalSlides }, (_, index) => `
+    <button
+      class="mobile-page-dot${index === state.mobileSlideIndex ? " is-active" : ""}"
+      type="button"
+      data-slide-index="${index}"
+      aria-label="비교 ${index + 1} 보기"
+      aria-pressed="${String(index === state.mobileSlideIndex)}"
+    ></button>
+  `).join("");
+}
+
+function scrollMobileCompareTo(index, smooth = true) {
+  const slides = [...elements.mobileCompareTrack.querySelectorAll(".mobile-compare-slide")];
+  if (!slides.length) return;
+
+  const clampedIndex = Math.max(0, Math.min(index, slides.length - 1));
+  state.mobileSlideIndex = clampedIndex;
+  updateMobileCompareNavigation(slides.length);
+
+  elements.mobileCompareTrack.scrollTo({
+    left: slides[clampedIndex].offsetLeft,
+    behavior: smooth ? "smooth" : "auto"
+  });
+}
+
+function renderMobileCompare(payload) {
+  const slots = Array.isArray(payload.slots) ? payload.slots : [];
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  const { benchmarkSlot, benchmarkIndex, compareEntries } = getMobileCompareEntries(slots);
+
+  if (!benchmarkSlot || !compareEntries.length || !rows.length) {
+    elements.mobileCompareTrack.innerHTML = "";
+    updateMobileCompareNavigation(0);
+    return;
+  }
+
+  state.mobileSlideIndex = Math.min(state.mobileSlideIndex, compareEntries.length - 1);
+
+  elements.mobileCompareTrack.innerHTML = compareEntries.map((entry, slideIndex) => {
+    const compareSlot = entry.slot;
+    const title = `${benchmarkSlot.name || benchmarkSlot.code || "기준"} + ${compareSlot.name || compareSlot.code || "종목"}`;
+    const benchmarkLabel = benchmarkSlot.code || benchmarkSlot.name || "기준";
+    const compareLabel = compareSlot.code || compareSlot.name || "종목";
+
+    return `
+      <article class="mobile-compare-slide" data-slide-index="${slideIndex}">
+        <div class="mobile-compare-head">
+          <div>
+            <p class="mobile-compare-kicker">좌우로 넘겨 비교</p>
+            <h3 class="mobile-compare-title">${escapeHtml(title)}</h3>
+          </div>
+        </div>
+
+        <div class="mobile-compare-grid">
+          <div class="mobile-compare-row is-head">
+            <span>일자</span>
+            <span>${escapeHtml(benchmarkLabel)}</span>
+            <span>${escapeHtml(compareLabel)}</span>
+          </div>
+          ${rows.map((row) => {
+            const benchmarkCell = row.values?.[benchmarkIndex] || {};
+            const compareCell = row.values?.[entry.index] || {};
+            return `
+              <div class="mobile-compare-row">
+                <span class="mobile-compare-date">${escapeHtml(row.displayDate || row.date || "-")}</span>
+                <span class="${getToneClass(Number(benchmarkCell.value))}">${escapeHtml(benchmarkCell.display || "-")}</span>
+                <span class="${getToneClass(Number(compareCell.value))}">${escapeHtml(compareCell.display || "-")}</span>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  updateMobileCompareNavigation(compareEntries.length);
+  requestAnimationFrame(() => {
+    scrollMobileCompareTo(state.mobileSlideIndex, false);
+  });
+}
+
 function renderDashboard(payload) {
   state.dashboard = payload;
 
@@ -318,6 +435,7 @@ function renderDashboard(payload) {
 
   renderSlots(payload.slots || []);
   renderTable(payload);
+  renderMobileCompare(payload);
 }
 
 async function loadDashboard(date = getTodayKstDate()) {
@@ -388,6 +506,44 @@ function bindEvents() {
   elements.saveTickersButton.addEventListener("click", () => {
     saveTickers().catch((error) => {
       setStatus(error.message, "error");
+    });
+  });
+
+  elements.mobilePrevButton.addEventListener("click", () => {
+    scrollMobileCompareTo(state.mobileSlideIndex - 1);
+  });
+
+  elements.mobileNextButton.addEventListener("click", () => {
+    scrollMobileCompareTo(state.mobileSlideIndex + 1);
+  });
+
+  elements.mobileCompareDots.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-slide-index]");
+    if (!target) return;
+    scrollMobileCompareTo(Number(target.dataset.slideIndex));
+  });
+
+  elements.mobileCompareTrack.addEventListener("scroll", () => {
+    const slides = [...elements.mobileCompareTrack.querySelectorAll(".mobile-compare-slide")];
+    if (!slides.length) return;
+
+    const currentLeft = elements.mobileCompareTrack.scrollLeft;
+    const closestIndex = slides.reduce((bestIndex, slide, index) => {
+      const bestDistance = Math.abs(slides[bestIndex].offsetLeft - currentLeft);
+      const nextDistance = Math.abs(slide.offsetLeft - currentLeft);
+      return nextDistance < bestDistance ? index : bestIndex;
+    }, 0);
+
+    if (closestIndex !== state.mobileSlideIndex) {
+      state.mobileSlideIndex = closestIndex;
+      updateMobileCompareNavigation(slides.length);
+    }
+  }, { passive: true });
+
+  window.addEventListener("resize", () => {
+    if (!state.dashboard) return;
+    requestAnimationFrame(() => {
+      scrollMobileCompareTo(state.mobileSlideIndex, false);
     });
   });
 }
