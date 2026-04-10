@@ -11,7 +11,6 @@ const state = {
 };
 
 const elements = {
-  todayButton: document.getElementById("today-button"),
   dateInput: document.getElementById("date-input"),
   refreshButton: document.getElementById("refresh-button"),
   setupCard: document.getElementById("setup-card"),
@@ -105,7 +104,6 @@ function getToneClass(value) {
 
 function setBusyState(isBusy) {
   elements.refreshButton.disabled = isBusy;
-  elements.todayButton.disabled = isBusy;
   elements.dateInput.disabled = isBusy;
   elements.saveTickersButton.disabled = isBusy;
   document.querySelectorAll(".slot-input").forEach((input) => {
@@ -309,8 +307,6 @@ function renderDashboard(payload) {
   elements.updatedAt.textContent = `마지막 동기화 ${formatTimestamp(payload.updatedAt)}`;
   elements.selectedDateBadge.textContent = `기준일 ${formatFullDate(payload.selectedDate)}`;
   elements.lastTradingBadge.textContent = `마지막 거래일 ${formatFullDate(payload.lastTradingDate)}`;
-  elements.todayButton.textContent = `Today ${formatFullDate(payload.today)}`;
-
   const sameDay = payload.selectedDate === payload.lastTradingDate;
   elements.summaryNote.textContent = sameDay
     ? "상단은 종목명, 가운데는 티커, 하단은 월 누적 등가률 합계입니다."
@@ -369,12 +365,6 @@ async function saveTickers() {
 }
 
 function bindEvents() {
-  elements.todayButton.addEventListener("click", () => {
-    loadDashboard(getTodayKstDate()).catch((error) => {
-      setStatus(error.message, "error");
-    });
-  });
-
   elements.refreshButton.addEventListener("click", () => {
     loadDashboard(elements.dateInput.value || getTodayKstDate()).catch((error) => {
       setStatus(error.message, "error");
@@ -382,6 +372,14 @@ function bindEvents() {
   });
 
   elements.dateInput.addEventListener("change", () => {
+    loadDashboard(elements.dateInput.value || getTodayKstDate()).catch((error) => {
+      setStatus(error.message, "error");
+    });
+  });
+
+  elements.dateInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
     loadDashboard(elements.dateInput.value || getTodayKstDate()).catch((error) => {
       setStatus(error.message, "error");
     });

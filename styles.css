@@ -59,14 +59,6 @@ input {
   box-shadow: var(--shadow);
 }
 
-.hero-card {
-  padding: 28px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
-  gap: 20px;
-  align-items: end;
-}
-
 .eyebrow,
 .section-kicker {
   margin: 0 0 8px;
@@ -77,18 +69,61 @@ input {
   color: var(--brand);
 }
 
-.hero-card h1,
+.toolbar-card {
+  padding: 14px 18px;
+}
+
+.toolbar-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: end;
+  gap: 12px;
+}
+
 .section-head h2 {
   margin: 0;
   letter-spacing: -0.04em;
 }
 
-.hero-card h1 {
-  font-size: clamp(2rem, 4vw, 3.5rem);
-  line-height: 0.95;
+.compact-date-field {
+  display: grid;
+  gap: 6px;
+  min-width: min(320px, 100%);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
 }
 
-.hero-note,
+.compact-date-field input,
+.date-field input,
+.slot-input {
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.compact-date-field input {
+  height: 46px;
+  padding: 0 14px;
+}
+
+.compact-button {
+  min-width: 112px;
+  min-height: 46px;
+  border-radius: 14px;
+}
+
+.compact-date-field input:focus,
+.slot-input:focus {
+  border-color: rgba(0, 95, 115, 0.5);
+  box-shadow: 0 0 0 4px rgba(0, 95, 115, 0.09);
+  transform: translateY(-1px);
+}
+
 .section-note,
 .editor-note,
 .setup-card p,
@@ -98,7 +133,6 @@ input {
   color: var(--muted);
 }
 
-.hero-note code,
 .setup-card code {
   display: inline-block;
   padding: 2px 8px;
@@ -107,43 +141,6 @@ input {
   color: var(--brand);
   font-family: Consolas, "SFMono-Regular", monospace;
   font-size: 0.92em;
-}
-
-.hero-actions {
-  display: grid;
-  gap: 12px;
-  justify-items: stretch;
-}
-
-.date-field {
-  display: grid;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--muted);
-}
-
-.date-field input,
-.slot-input {
-  width: 100%;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
-  color: var(--text);
-  outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
-}
-
-.date-field input {
-  height: 52px;
-  padding: 0 16px;
-}
-
-.date-field input:focus,
-.slot-input:focus {
-  border-color: rgba(0, 95, 115, 0.5);
-  box-shadow: 0 0 0 4px rgba(0, 95, 115, 0.09);
-  transform: translateY(-1px);
 }
 
 .primary-button,
@@ -447,11 +444,6 @@ thead th:first-child {
     margin-bottom: 26px;
   }
 
-  .hero-card {
-    grid-template-columns: 1fr;
-    padding: 22px;
-  }
-
   .section-head,
   .editor-row {
     flex-direction: column;
@@ -467,10 +459,19 @@ thead th:first-child {
   .slot-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .compact-date-field {
+    min-width: 100%;
+  }
 }
 
 @media (max-width: 640px) {
-  .hero-card,
+  .toolbar-card,
   .summary-card,
   .table-card {
     padding: 18px;
@@ -481,13 +482,9 @@ thead th:first-child {
     grid-template-columns: 1fr;
   }
 
-  .hero-card h1 {
-    font-size: 2.35rem;
-  }
-
   .primary-button,
   .ghost-button,
-  .date-field input {
+  .compact-date-field input {
     min-height: 48px;
     border-radius: 15px;
   }

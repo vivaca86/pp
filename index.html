@@ -11,25 +11,14 @@
 </head>
 <body>
   <main class="page-shell">
-    <section class="hero-card panel">
-      <div class="hero-copy">
-        <p class="eyebrow">Sheet Connected Dashboard</p>
-        <h1>월간 등가률 보드</h1>
-        <p class="hero-note">
-          <code>시트2!A3</code> 기준일과 <code>시트2!C2:I2</code> 티커를 그대로 읽고 수정합니다.
-          표에는 실제 거래일만 남기고, 카드 하단에는 월 누적 등가률 합계를 보여줍니다.
-        </p>
-      </div>
-
-      <div class="hero-actions">
-        <button id="today-button" class="ghost-button" type="button">Today</button>
-
-        <label class="date-field" for="date-input">
+    <section class="toolbar-card panel">
+      <div class="toolbar-row">
+        <label class="compact-date-field" for="date-input">
           <span>기준일</span>
           <input id="date-input" type="date">
         </label>
 
-        <button id="refresh-button" class="primary-button" type="button">새로고침</button>
+        <button id="refresh-button" class="primary-button compact-button" type="button">확인</button>
       </div>
     </section>
 
