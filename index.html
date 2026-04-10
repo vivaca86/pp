@@ -181,7 +181,7 @@
     const bodyEl = document.getElementById("table-body");
     const statusEl = document.getElementById("status");
     const refreshButton = document.getElementById("refresh-btn");
-    const DEFAULT_HEADERS = ["KOSPI", "005930", "000660", "042700", "066970", "047040", "", ""];
+    const FIXED_HEADERS = ["KOSPI", "005930", "000660", "042700", "066970", "047040"];
     const MAX_COLUMNS = 9; // A~I
 
     function cleanCellValue(cell) {
@@ -286,8 +286,10 @@
         const detectedTopDate = rows.find((row) => isDateText(row[0]))?.[0] || new Date().toISOString().slice(0, 10);
         const baseDate = normalizeDateString(detectedTopDate, new Date().getFullYear()) || new Date();
         const sheetHeaderRow = rows.find((row) => row.some((cell) => String(cell).trim() === "KOSPI"));
-        const effectiveHeaders = (sheetHeaderRow ? sheetHeaderRow.slice(1, MAX_COLUMNS) : colLabels.slice(1, MAX_COLUMNS));
-        const headerRow = normalizeRowLength([detectedTopDate, ...(effectiveHeaders.length ? effectiveHeaders : DEFAULT_HEADERS)]);
+        const extraHeadersFromSheet = sheetHeaderRow ? sheetHeaderRow.slice(7, MAX_COLUMNS) : [];
+        const extraHeadersFromCols = colLabels.slice(7, MAX_COLUMNS).filter(Boolean);
+        const extraHeaders = (extraHeadersFromSheet.length ? extraHeadersFromSheet : extraHeadersFromCols).slice(0, 2);
+        const headerRow = normalizeRowLength([detectedTopDate, ...FIXED_HEADERS, ...extraHeaders]);
 
         const dataRows = rows
           .filter((row) => /^\d{2}[-./]\d{2}$/.test(String(row[0]).trim()))
