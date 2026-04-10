@@ -535,19 +535,19 @@ thead th:first-child {
 
   .mobile-compare-controls {
     display: grid;
-    grid-template-columns: 40px 1fr 40px;
+    grid-template-columns: 36px 1fr 36px;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
   }
 
   .mobile-nav-button {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.88);
     color: var(--text);
-    font-size: 22px;
+    font-size: 20px;
     line-height: 1;
     cursor: pointer;
   }
@@ -559,7 +559,7 @@ thead th:first-child {
 
   .mobile-compare-count {
     text-align: center;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
     color: var(--muted);
   }
@@ -568,7 +568,7 @@ thead th:first-child {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: 100%;
-    gap: 12px;
+    gap: 10px;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
@@ -582,51 +582,44 @@ thead th:first-child {
 
   .mobile-compare-slide {
     scroll-snap-align: start;
-    border-radius: 20px;
+    border-radius: 18px;
     border: 1px solid rgba(15, 23, 42, 0.07);
     background: rgba(255, 255, 255, 0.94);
     box-shadow: 0 16px 30px -26px rgba(15, 23, 42, 0.22);
-    padding: 14px;
+    padding: 12px;
   }
 
   .mobile-compare-head {
-    margin-bottom: 10px;
-  }
-
-  .mobile-compare-kicker {
-    margin: 0 0 6px;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    color: var(--brand);
+    margin-bottom: 8px;
   }
 
   .mobile-compare-title {
     margin: 0;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1.2;
     letter-spacing: -0.03em;
   }
 
   .mobile-compare-grid {
     display: grid;
-    gap: 2px;
+    gap: 1px;
   }
 
   .mobile-compare-row {
     display: grid;
-    grid-template-columns: minmax(82px, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: minmax(62px, 0.9fr) repeat(3, minmax(0, 1fr));
+    gap: 6px;
     align-items: center;
-    padding: 10px 0;
+    padding: 8px 0;
     border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .mobile-compare-row span {
     min-width: 0;
     text-align: right;
     word-break: keep-all;
+    letter-spacing: -0.01em;
   }
 
   .mobile-compare-row span:first-child {
@@ -637,16 +630,17 @@ thead th:first-child {
 
   .mobile-compare-row.is-head {
     padding-top: 0;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
     color: var(--muted);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
   .mobile-compare-row.is-head span {
     font-weight: 800;
     color: var(--muted);
+    word-break: break-word;
   }
 
   .mobile-compare-row:last-child {
@@ -661,8 +655,8 @@ thead th:first-child {
   }
 
   .mobile-page-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border: 0;
     border-radius: 999px;
     background: rgba(15, 23, 42, 0.14);
@@ -778,21 +772,21 @@ thead th:first-child {
   }
 
   .mobile-compare-slide {
-    padding: 12px;
+    padding: 10px;
   }
 
   .mobile-compare-title {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .mobile-compare-row {
-    grid-template-columns: minmax(74px, 1.05fr) minmax(0, 1fr) minmax(0, 1fr);
-    gap: 8px;
-    font-size: 12px;
+    grid-template-columns: minmax(56px, 0.85fr) repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    font-size: 11px;
   }
 
   .mobile-compare-row.is-head {
-    font-size: 10px;
+    font-size: 9px;
   }
 }
 

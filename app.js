@@ -109,6 +109,11 @@ function getSlotDisplayLabel(slot) {
   return slot.name || slot.code || "-";
 }
 
+function formatDeltaPercent(baseValue, compareValue) {
+  if (!Number.isFinite(baseValue) || !Number.isFinite(compareValue)) return "-";
+  return formatPercent(compareValue - baseValue, 2);
+}
+
 function setBusyState(isBusy) {
   elements.dateInput.disabled = isBusy;
   document.querySelectorAll(".slot-input").forEach((input) => {
@@ -387,15 +392,21 @@ function renderMobileCompare(payload) {
             <span>일자</span>
             <span>${escapeHtml(benchmarkLabel)}</span>
             <span>${escapeHtml(compareLabel)}</span>
+            <span>차이</span>
           </div>
           ${rows.map((row) => {
             const benchmarkCell = row.values?.[benchmarkIndex] || {};
             const compareCell = row.values?.[entry.index] || {};
+            const benchmarkValue = Number.isFinite(benchmarkCell.value) ? benchmarkCell.value : NaN;
+            const compareValue = Number.isFinite(compareCell.value) ? compareCell.value : NaN;
+            const differenceText = formatDeltaPercent(benchmarkValue, compareValue);
+            const differenceTone = differenceText === "-" ? "tone-neutral" : getToneClass(compareValue - benchmarkValue);
             return `
               <div class="mobile-compare-row">
                 <span class="mobile-compare-date">${escapeHtml(row.displayDate || row.date || "-")}</span>
                 <span class="${getToneClass(Number(benchmarkCell.value))}">${escapeHtml(benchmarkCell.display || "-")}</span>
                 <span class="${getToneClass(Number(compareCell.value))}">${escapeHtml(compareCell.display || "-")}</span>
+                <span class="${differenceTone}">${escapeHtml(differenceText)}</span>
               </div>
             `;
           }).join("")}
