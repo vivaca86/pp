@@ -104,6 +104,11 @@ function getToneClass(value) {
   return "tone-neutral";
 }
 
+function getSlotDisplayLabel(slot) {
+  if (!slot) return "-";
+  return slot.name || slot.code || "-";
+}
+
 function setBusyState(isBusy) {
   elements.dateInput.disabled = isBusy;
   document.querySelectorAll(".slot-input").forEach((input) => {
@@ -276,12 +281,12 @@ function renderSlots(slots) {
 function renderTable(payload) {
   const slots = Array.isArray(payload.slots) ? payload.slots : [];
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
-  const columnLabels = slots.map((slot) => slot.code || "-");
+  const columnLabels = slots.map((slot) => getSlotDisplayLabel(slot));
 
   elements.tableHead.innerHTML = `
     <tr>
       <th>날짜</th>
-      ${slots.map((slot) => `<th>${escapeHtml(slot.code || "-")}</th>`).join("")}
+      ${slots.map((slot) => `<th>${escapeHtml(getSlotDisplayLabel(slot))}</th>`).join("")}
     </tr>
   `;
 
@@ -368,8 +373,8 @@ function renderMobileCompare(payload) {
   elements.mobileCompareTrack.innerHTML = compareEntries.map((entry, slideIndex) => {
     const compareSlot = entry.slot;
     const title = compareSlot.name || compareSlot.code || "종목";
-    const benchmarkLabel = benchmarkSlot.code || benchmarkSlot.name || "기준";
-    const compareLabel = compareSlot.code || compareSlot.name || "종목";
+    const benchmarkLabel = getSlotDisplayLabel(benchmarkSlot);
+    const compareLabel = getSlotDisplayLabel(compareSlot);
 
     return `
       <article class="mobile-compare-slide" data-slide-index="${slideIndex}">
