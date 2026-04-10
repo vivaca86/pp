@@ -9,7 +9,7 @@
       margin: 0;
       padding: 24px;
       font-family: Arial, Helvetica, sans-serif;
-      background: #ffffff;
+      background: #fff;
     }
 
     .sheet {
@@ -45,32 +45,120 @@
     .down {
       color: #002cff !important;
     }
+
+    .loading,
+    .error {
+      margin-top: 12px;
+      font-size: 16px;
+    }
+
+    .error {
+      color: #c00000;
+    }
   </style>
 </head>
 <body>
   <table class="sheet" aria-label="KOSPI 및 종목별 일자별 등락률">
-    <thead>
-      <tr>
-        <th class="date">2026-04-10</th>
-        <th>KOSPI</th>
-        <th>005930</th>
-        <th>000660</th>
-        <th>042700</th>
-        <th>066970</th>
-        <th>047040</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>04-09</td><td class="up">1.77%</td><td class="up">1.96%</td><td class="up">3.11%</td><td class="up">0.17%</td><td class="up">2.62%</td><td class="up">5.35%</td></tr>
-      <tr><td>04-08</td><td class="down">-1.61%</td><td class="down">-3.09%</td><td class="down">-3.39%</td><td class="up">1.96%</td><td class="down">-0.54%</td><td class="up">3.55%</td></tr>
-      <tr><td>04-07</td><td class="up">6.87%</td><td class="up">7.12%</td><td class="up">12.77%</td><td class="up">10.65%</td><td class="down">-0.49%</td><td class="up">29.97%</td></tr>
-      <tr><td>04-06</td><td class="up">0.82%</td><td class="up">1.76%</td><td class="up">3.39%</td><td class="up">0.60%</td><td class="up">8.44%</td><td class="up">0.23%</td></tr>
-      <tr><td>04-05</td><td class="up">1.36%</td><td class="up">3.71%</td><td class="up">1.14%</td><td class="down">-3.08%</td><td class="up">2.52%</td><td class="up">2.97%</td></tr>
-      <tr><td>04-04</td><td class="up">2.74%</td><td class="up">4.37%</td><td class="up">5.54%</td><td class="up">1.56%</td><td class="up">2.97%</td><td class="up">2.25%</td></tr>
-      <tr><td>04-03</td><td class="up">2.74%</td><td class="up">4.37%</td><td class="up">5.54%</td><td class="up">1.56%</td><td class="up">2.97%</td><td class="up">2.25%</td></tr>
-      <tr><td>04-02</td><td class="down">-4.47%</td><td class="down">-5.93%</td><td class="down">-7.47%</td><td class="down">-6.40%</td><td class="up">9.71%</td><td class="down">-15.13%</td></tr>
-      <tr><td>04-01</td><td class="up">8.44%</td><td class="up">13.43%</td><td class="up">11.15%</td><td class="up">8.96%</td><td class="up">2.36%</td><td class="up">24.57%</td></tr>
-    </tbody>
+    <thead id="table-head"></thead>
+    <tbody id="table-body"></tbody>
   </table>
+
+  <p id="status" class="loading">스프레드시트 데이터 불러오는 중...</p>
+
+  <script>
+    const SHEET_ID = "1_vwuRC2LhZvRCf3r6Ub1I3s-RoPxGm8bn5kiUI-m8ik";
+    const GID = "275556284";
+    const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json`;
+
+    const headEl = document.getElementById("table-head");
+    const bodyEl = document.getElementById("table-body");
+    const statusEl = document.getElementById("status");
+
+    function cleanCellValue(cell) {
+      if (!cell) return "";
+      if (typeof cell.f === "string") return cell.f;
+      if (cell.v === null || cell.v === undefined) return "";
+      return String(cell.v);
+    }
+
+    function parseRate(valueText) {
+      const normalized = valueText.replace("%", "").trim();
+      const rate = Number(normalized);
+      return Number.isFinite(rate) ? rate : null;
+    }
+
+    function applyRateClass(cellEl, valueText) {
+      const rate = parseRate(valueText);
+      if (rate === null) return;
+      if (rate > 0) cellEl.classList.add("up");
+      if (rate < 0) cellEl.classList.add("down");
+    }
+
+    function renderTable(rows) {
+      headEl.innerHTML = "";
+      bodyEl.innerHTML = "";
+
+      if (!rows.length) {
+        throw new Error("표시할 데이터가 없습니다.");
+      }
+
+      const headerRow = rows[0];
+      const headerTr = document.createElement("tr");
+
+      headerRow.forEach((text, index) => {
+        const th = document.createElement("th");
+        th.textContent = text;
+        if (index === 0) th.classList.add("date");
+        headerTr.appendChild(th);
+      });
+
+      headEl.appendChild(headerTr);
+
+      rows.slice(1).forEach((row) => {
+        const tr = document.createElement("tr");
+
+        row.forEach((text, index) => {
+          const td = document.createElement("td");
+          td.textContent = text;
+
+          if (index > 0) {
+            applyRateClass(td, text);
+          }
+
+          tr.appendChild(td);
+        });
+
+        bodyEl.appendChild(tr);
+      });
+    }
+
+    async function loadSheet() {
+      try {
+        const response = await fetch(GVIZ_URL);
+        const raw = await response.text();
+
+        const jsonText = raw
+          .replace("/*O_o*/", "")
+          .replace(/google\.visualization\.Query\.setResponse\(/, "")
+          .replace(/\);\s*$/, "");
+
+        const parsed = JSON.parse(jsonText);
+        const rawRows = parsed.table.rows || [];
+
+        const rows = rawRows
+          .map((row) => (row.c || []).map(cleanCellValue))
+          .filter((row) => row.some((cell) => cell !== ""));
+
+        renderTable(rows);
+        statusEl.textContent = `마지막 동기화: ${new Date().toLocaleString("ko-KR")}`;
+        statusEl.className = "loading";
+      } catch (error) {
+        statusEl.textContent = `데이터를 불러오지 못했습니다: ${error.message}`;
+        statusEl.className = "error";
+      }
+    }
+
+    loadSheet();
+  </script>
 </body>
 </html>
