@@ -106,37 +106,6 @@
       overflow-x: auto;
     }
 
-    .top-row-area {
-      border-bottom: 1px solid var(--line);
-      background: linear-gradient(180deg, #f8fbff 0%, #f3f7ff 100%);
-      padding: 12px 16px;
-    }
-
-    .top-row-title {
-      margin: 0 0 8px;
-      font-size: 12px;
-      color: var(--muted);
-      font-weight: 600;
-      letter-spacing: 0.02em;
-    }
-
-    .top-row-grid {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(84px, 1fr));
-      gap: 8px;
-    }
-
-    .top-chip {
-      background: #fff;
-      border: 1px solid #dbe4f2;
-      border-radius: 10px;
-      padding: 8px 10px;
-      text-align: center;
-      font-size: 13px;
-      font-weight: 700;
-      color: #334155;
-    }
-
     table {
       width: 100%;
       min-width: 760px;
@@ -193,10 +162,6 @@
           <button id="refresh-btn" type="button">새로고침</button>
         </div>
       </header>
-      <div class="top-row-area">
-        <p class="top-row-title">맨 위 기준 행</p>
-        <div id="top-row-grid" class="top-row-grid"></div>
-      </div>
 
       <div class="table-wrap">
         <table>
@@ -216,7 +181,7 @@
     const bodyEl = document.getElementById("table-body");
     const statusEl = document.getElementById("status");
     const refreshButton = document.getElementById("refresh-btn");
-    const topRowGridEl = document.getElementById("top-row-grid");
+    const DEFAULT_HEADERS = ["KOSPI", "005930", "000660", "042700", "066970", "047040"];
 
     function cleanCellValue(cell) {
       if (!cell) return "";
@@ -242,7 +207,7 @@
       statusEl.className = isError ? "status error" : "status";
     }
 
-    function renderTable(rows) {
+    function renderTable(headerRow, rows) {
       headEl.innerHTML = "";
       bodyEl.innerHTML = "";
 
@@ -251,14 +216,14 @@
       }
 
       const headerTr = document.createElement("tr");
-      rows[0].forEach((text) => {
+      headerRow.forEach((text) => {
         const th = document.createElement("th");
         th.textContent = text;
         headerTr.appendChild(th);
       });
       headEl.appendChild(headerTr);
 
-      rows.slice(1).forEach((row) => {
+      rows.forEach((row) => {
         const tr = document.createElement("tr");
         row.forEach((text, index) => {
           const td = document.createElement("td");
@@ -270,15 +235,8 @@
       });
     }
 
-    function renderTopRow(row) {
-      topRowGridEl.innerHTML = "";
-      row.forEach((text, index) => {
-        const chip = document.createElement("div");
-        chip.className = "top-chip";
-        chip.textContent = text;
-        if (index > 0) applyRateClass(chip, text);
-        topRowGridEl.appendChild(chip);
-      });
+    function isDateText(value) {
+      return /^(?:\d{4}[-./]\d{1,2}[-./]\d{1,2}|\d{2}[-./]\d{2})$/.test(String(value).trim());
     }
 
     async function loadSheet() {
@@ -300,8 +258,14 @@
           .map((row) => (row.c || []).map(cleanCellValue))
           .filter((row) => row.some((cell) => cell !== ""));
 
-        renderTopRow(rows[0]);
-        renderTable(rows);
+        const detectedTopDate = rows.find((row) => isDateText(row[0]))?.[0] || new Date().toISOString().slice(0, 10);
+        const headerRow = [detectedTopDate, ...DEFAULT_HEADERS];
+
+        const dataRows = rows
+          .filter((row) => /^\d{2}[-./]\d{2}$/.test(String(row[0]).trim()))
+          .map((row) => row.slice(0, 7));
+
+        renderTable(headerRow, dataRows);
         setStatus(`마지막 동기화: ${new Date().toLocaleString("ko-KR")}`);
       } catch (error) {
         setStatus(`불러오기 실패: ${error.message}`, true);
