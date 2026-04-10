@@ -187,6 +187,7 @@ function buildDashboardPayload_(context) {
   var displayValues = controlRange.getDisplayValues();
   var selectedDate = getSelectedDateIso_(context.controlSheet);
   var today = todayIsoKst_();
+  var selectedDateIsToday = selectedDate === today;
   var tradingDates = readTradingDates_(context.indexSheet);
   var tradingSet = {};
   for (var i = 0; i < tradingDates.length; i += 1) {
@@ -200,10 +201,6 @@ function buildDashboardPayload_(context) {
   for (var rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
     var rowDateIso = coerceSheetDateToIso_(values[rowIndex][0]);
     if (!rowDateIso || rowDateIso.slice(0, 7) !== selectedDate.slice(0, 7)) {
-      continue;
-    }
-
-    if (tradingDates.length && !tradingSet[rowDateIso]) {
       continue;
     }
 
@@ -235,6 +232,15 @@ function buildDashboardPayload_(context) {
       continue;
     }
 
+    var includeRow = !tradingDates.length || Boolean(tradingSet[rowDateIso]);
+    if (!includeRow && selectedDateIsToday && rowDateIso === selectedDate) {
+      includeRow = true;
+    }
+
+    if (!includeRow) {
+      continue;
+    }
+
     rows.push({
       date: rowDateIso,
       displayDate: formatMonthDay_(rowDateIso),
@@ -254,7 +260,9 @@ function buildDashboardPayload_(context) {
     spreadsheetTitle: context.spreadsheet.getName(),
     selectedDate: selectedDate,
     selectedDateLabel: formatHumanDate_(selectedDate),
-    selectedDateIsTradingDay: Boolean(tradingSet[selectedDate]),
+    selectedDateIsTradingDay: Boolean(tradingSet[selectedDate]) || (selectedDateIsToday && rows.some(function (row) {
+      return row.date === selectedDate;
+    })),
     today: today,
     lastTradingDate: lastTradingDate,
     lastTradingDateLabel: formatHumanDate_(lastTradingDate),
