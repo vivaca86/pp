@@ -202,6 +202,10 @@ input {
   align-items: flex-start;
 }
 
+.summary-head {
+  align-items: center;
+}
+
 .status-stack {
   text-align: right;
 }
@@ -339,7 +343,7 @@ input {
 }
 
 .table-head {
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .date-badges {
@@ -460,10 +464,20 @@ thead th:first-child {
     align-items: stretch;
   }
 
+  .summary-head {
+    flex-direction: row;
+    align-items: center;
+  }
+
   .status-stack,
   .date-badges {
     text-align: left;
     justify-content: flex-start;
+  }
+
+  .summary-head .status-stack {
+    margin-left: auto;
+    text-align: right;
   }
 
   .slot-grid {
@@ -483,6 +497,17 @@ thead th:first-child {
   .date-badge {
     width: 100%;
     justify-content: center;
+  }
+
+  .summary-head .status-pill {
+    width: auto;
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+
+  .summary-head .updated-at {
+    display: none;
   }
 
   .slot-card {
@@ -693,7 +718,7 @@ thead th:first-child {
   }
 
   .slot-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
@@ -712,6 +737,10 @@ thead th:first-child {
   .date-badges {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .summary-head {
+    align-items: flex-start;
   }
 }
 
@@ -766,5 +795,11 @@ thead th:first-child {
 
   .mobile-compare-row.is-head {
     font-size: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .slot-grid {
+    grid-template-columns: 1fr;
   }
 }

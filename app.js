@@ -17,12 +17,7 @@ const elements = {
   setupCard: document.getElementById("setup-card"),
   statusPill: document.getElementById("status-pill"),
   updatedAt: document.getElementById("updated-at"),
-  summaryNote: document.getElementById("summary-note"),
   slotGrid: document.getElementById("slot-grid"),
-  saveTickersButton: document.getElementById("save-tickers-button"),
-  tableNote: document.getElementById("table-note"),
-  selectedDateBadge: document.getElementById("selected-date-badge"),
-  lastTradingBadge: document.getElementById("last-trading-badge"),
   tableHead: document.getElementById("table-head"),
   tableBody: document.getElementById("table-body"),
   mobileCompare: document.getElementById("mobile-compare"),
@@ -113,7 +108,6 @@ function getToneClass(value) {
 function setBusyState(isBusy) {
   elements.refreshButton.disabled = isBusy;
   elements.dateInput.disabled = isBusy;
-  elements.saveTickersButton.disabled = isBusy;
   document.querySelectorAll(".slot-input").forEach((input) => {
     input.disabled = isBusy || input.dataset.editable !== "true";
   });
@@ -375,17 +369,14 @@ function renderMobileCompare(payload) {
 
   elements.mobileCompareTrack.innerHTML = compareEntries.map((entry, slideIndex) => {
     const compareSlot = entry.slot;
-    const title = `${benchmarkSlot.name || benchmarkSlot.code || "기준"} + ${compareSlot.name || compareSlot.code || "종목"}`;
+    const title = compareSlot.name || compareSlot.code || "종목";
     const benchmarkLabel = benchmarkSlot.code || benchmarkSlot.name || "기준";
     const compareLabel = compareSlot.code || compareSlot.name || "종목";
 
     return `
       <article class="mobile-compare-slide" data-slide-index="${slideIndex}">
         <div class="mobile-compare-head">
-          <div>
-            <p class="mobile-compare-kicker">좌우로 넘겨 비교</p>
-            <h3 class="mobile-compare-title">${escapeHtml(title)}</h3>
-          </div>
+          <h3 class="mobile-compare-title">${escapeHtml(title)}</h3>
         </div>
 
         <div class="mobile-compare-grid">
@@ -422,17 +413,6 @@ function renderDashboard(payload) {
   elements.dateInput.value = payload.selectedDate || "";
   elements.dateInput.max = payload.today || getTodayKstDate();
   elements.updatedAt.textContent = `마지막 동기화 ${formatTimestamp(payload.updatedAt)}`;
-  elements.selectedDateBadge.textContent = `기준일 ${formatFullDate(payload.selectedDate)}`;
-  elements.lastTradingBadge.textContent = `마지막 거래일 ${formatFullDate(payload.lastTradingDate)}`;
-  const sameDay = payload.selectedDate === payload.lastTradingDate;
-  elements.summaryNote.textContent = sameDay
-    ? "상단은 종목명, 가운데는 티커, 하단은 월 누적 등가률 합계입니다."
-    : `선택일이 휴장 또는 미체결일이라 실제 표는 ${formatFullDate(payload.lastTradingDate)} 까지만 표시됩니다.`;
-
-  elements.tableNote.textContent = sameDay
-    ? `${formatFullDate(payload.selectedDate)} 기준 실제 거래일 ${payload.rows.length}일을 표시합니다.`
-    : `${formatFullDate(payload.selectedDate)} 을 선택했고, 실제 거래일은 ${formatFullDate(payload.lastTradingDate)} 까지 반영됐습니다.`;
-
   renderSlots(payload.slots || []);
   renderTable(payload);
   renderMobileCompare(payload);
@@ -499,12 +479,6 @@ function bindEvents() {
     if (event.key !== "Enter") return;
     event.preventDefault();
     loadDashboard(elements.dateInput.value || getTodayKstDate()).catch((error) => {
-      setStatus(error.message, "error");
-    });
-  });
-
-  elements.saveTickersButton.addEventListener("click", () => {
-    saveTickers().catch((error) => {
       setStatus(error.message, "error");
     });
   });
