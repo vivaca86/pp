@@ -359,6 +359,7 @@ input {
 
 .table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: 22px;
   border: 1px solid rgba(15, 23, 42, 0.06);
   background: rgba(255, 255, 255, 0.88);
@@ -468,18 +469,69 @@ thead th:first-child {
   .compact-date-field {
     min-width: 100%;
   }
+
+  .status-pill,
+  .date-badge {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .slot-card {
+    min-height: 164px;
+  }
+
+  table {
+    min-width: 760px;
+  }
 }
 
 @media (max-width: 640px) {
+  .page-shell {
+    width: min(100vw - 12px, 100%);
+    gap: 12px;
+    margin-top: 6px;
+    margin-bottom: 18px;
+  }
+
   .toolbar-card,
   .summary-card,
   .table-card {
-    padding: 18px;
-    border-radius: 22px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .toolbar-card {
+    padding: 12px;
+  }
+
+  .toolbar-row,
+  .section-head,
+  .editor-row {
+    gap: 12px;
+  }
+
+  .section-head h2,
+  .slot-name {
+    line-height: 1.15;
+  }
+
+  .section-head h2 {
+    font-size: 24px;
+  }
+
+  .slot-name {
+    font-size: 20px;
+  }
+
+  .slot-card {
+    min-height: auto;
+    padding: 16px;
+    gap: 10px;
   }
 
   .slot-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .primary-button,
@@ -487,5 +539,87 @@ thead th:first-child {
   .compact-date-field input {
     min-height: 48px;
     border-radius: 15px;
+  }
+
+  .compact-button,
+  .editor-row .primary-button {
+    width: 100%;
+  }
+
+  .date-badges {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  table,
+  tbody,
+  tbody tr,
+  tbody td {
+    display: block;
+    width: 100%;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  tbody tr {
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(15, 23, 42, 0.07);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 16px 30px -26px rgba(15, 23, 42, 0.22);
+  }
+
+  tbody tr:nth-child(even),
+  tbody tr:hover {
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    text-align: right;
+    font-size: 13px;
+  }
+
+  tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  tbody td:first-child {
+    padding-top: 0;
+    font-size: 14px;
+  }
+
+  tbody td:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
   }
 }

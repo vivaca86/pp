@@ -277,6 +277,7 @@ function renderSlots(slots) {
 function renderTable(payload) {
   const slots = Array.isArray(payload.slots) ? payload.slots : [];
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  const columnLabels = slots.map((slot) => slot.code || "-");
 
   elements.tableHead.innerHTML = `
     <tr>
@@ -287,9 +288,9 @@ function renderTable(payload) {
 
   elements.tableBody.innerHTML = rows.map((row) => `
     <tr>
-      <td>${escapeHtml(row.displayDate || row.date || "-")}</td>
-      ${row.values.map((cell) => `
-        <td class="${getToneClass(Number(cell.value))}">
+      <td data-label="Date">${escapeHtml(row.displayDate || row.date || "-")}</td>
+      ${row.values.map((cell, index) => `
+        <td data-label="${escapeHtml(columnLabels[index] || "-")}" class="${getToneClass(Number(cell.value))}">
           ${escapeHtml(cell.display || "-")}
         </td>
       `).join("")}
