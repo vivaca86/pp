@@ -252,9 +252,10 @@ function renderSlots(slots) {
   elements.slotGrid.innerHTML = slots.map((slot, index) => {
     const isFixed = !slot.editable;
     const totalText = `합계 ${formatPercent(Number(slot.total), 2)}`;
+    const caption = isFixed ? "기준 지수" : `선택 종목 ${index}`;
     return `
       <article class="slot-card${isFixed ? " is-fixed" : ""}" data-slot-index="${index}">
-        <p class="slot-caption">${isFixed ? "고정 기준" : `시트2!${String.fromCharCode(67 + index - 1)}2`}</p>
+        <p class="slot-caption">${caption}</p>
         <h3 class="slot-name">${escapeHtml(slot.name || slot.code || "종목명 확인 필요")}</h3>
         <input
           class="slot-input"
@@ -324,12 +325,12 @@ function renderDashboard(payload) {
 async function loadDashboard(date = getTodayKstDate()) {
   state.loading = true;
   setBusyState(true);
-  setStatus("시트 데이터를 불러오는 중", "loading");
+  setStatus("데이터 불러오는 중", "loading");
 
   try {
     const payload = await requestGateway({ action: "dashboard-data", date });
     renderDashboard(payload);
-    setStatus("시트와 동기화 완료", "success");
+    setStatus("업데이트 완료", "success");
   } finally {
     state.loading = false;
     state.saving = false;
@@ -342,7 +343,7 @@ async function saveTickers() {
 
   state.saving = true;
   setBusyState(true);
-  setStatus("티커를 시트에 반영하는 중", "loading");
+  setStatus("티커 저장 중", "loading");
 
   try {
     const tickerInputs = [...document.querySelectorAll(".slot-input[data-editable='true']")];
