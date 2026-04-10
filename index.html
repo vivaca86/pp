@@ -181,7 +181,8 @@
     const bodyEl = document.getElementById("table-body");
     const statusEl = document.getElementById("status");
     const refreshButton = document.getElementById("refresh-btn");
-    const DEFAULT_HEADERS = ["KOSPI", "005930", "000660", "042700", "066970", "047040"];
+    const DEFAULT_HEADERS = ["KOSPI", "005930", "000660", "042700", "066970", "047040", "H열", "I열"];
+    const MAX_COLUMNS = 9; // A~I
 
     function cleanCellValue(cell) {
       if (!cell) return "";
@@ -239,6 +240,23 @@
       return /^(?:\d{4}[-./]\d{1,2}[-./]\d{1,2}|\d{2}[-./]\d{2})$/.test(String(value).trim());
     }
 
+    function normalizeDateString(value, yearHint) {
+      const raw = String(value).trim().replace(/\./g, "-").replace(/\//g, "-");
+      if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) {
+        const [y, m, d] = raw.split("-").map(Number);
+        return new Date(y, m - 1, d);
+      }
+      if (/^\d{2}-\d{2}$/.test(raw)) {
+        const [m, d] = raw.split("-").map(Number);
+        return new Date(yearHint, m - 1, d);
+      }
+      return null;
+    }
+
+    function hasRateValue(row) {
+      return row.slice(1).some((cell) => parseRate(cell) !== null);
+    }
+
     async function loadSheet() {
       setStatus("데이터 불러오는 중...");
 
@@ -253,17 +271,28 @@
 
         const parsed = JSON.parse(jsonText);
         const rawRows = parsed.table.rows || [];
+        const colLabels = (parsed.table.cols || []).map((col) => String(col.label || "").trim());
 
         const rows = rawRows
           .map((row) => (row.c || []).map(cleanCellValue))
           .filter((row) => row.some((cell) => cell !== ""));
 
         const detectedTopDate = rows.find((row) => isDateText(row[0]))?.[0] || new Date().toISOString().slice(0, 10);
-        const headerRow = [detectedTopDate, ...DEFAULT_HEADERS];
+        const baseDate = normalizeDateString(detectedTopDate, new Date().getFullYear()) || new Date();
+        const effectiveHeaders = colLabels.slice(1, MAX_COLUMNS).filter(Boolean);
+        const headerRow = [detectedTopDate, ...(effectiveHeaders.length ? effectiveHeaders : DEFAULT_HEADERS)].slice(0, MAX_COLUMNS);
 
         const dataRows = rows
           .filter((row) => /^\d{2}[-./]\d{2}$/.test(String(row[0]).trim()))
-          .map((row) => row.slice(0, 7));
+          .map((row) => row.slice(0, MAX_COLUMNS))
+          .filter((row) => {
+            const date = normalizeDateString(row[0], baseDate.getFullYear());
+            if (!date) return false;
+            const day = date.getDay();
+            const isWeekend = day === 0 || day === 6;
+            if (isWeekend) return false;
+            return hasRateValue(row);
+          });
 
         renderTable(headerRow, dataRows);
         setStatus(`마지막 동기화: ${new Date().toLocaleString("ko-KR")}`);
