@@ -7,6 +7,8 @@ var PP_SHEET_GATEWAY = {
   controlRangeA1: 'A2:I40',
   indexDateRangeA1: 'B3:B80',
   catalogCacheHours: 24,
+  holidayCacheHours: 12,
+  holidayCalendarUrl: 'https://calendar.google.com/calendar/ical/ko.south_korea%23holiday%40group.v.calendar.google.com/public/basic.ics',
   recalcAttempts: 10,
   recalcPauseMs: 900,
   masterSources: [
@@ -188,6 +190,8 @@ function buildDashboardPayload_(context) {
   var selectedDate = getSelectedDateIso_(context.controlSheet);
   var today = todayIsoKst_();
   var selectedDateIsToday = selectedDate === today;
+  var selectedDateIsRedDay = isKoreanRedDay_(selectedDate);
+  var allowLiveSelectedDate = selectedDateIsToday && !selectedDateIsRedDay;
   var tradingDates = readTradingDates_(context.indexSheet);
   var tradingSet = {};
   for (var i = 0; i < tradingDates.length; i += 1) {
@@ -233,7 +237,7 @@ function buildDashboardPayload_(context) {
     }
 
     var includeRow = !tradingDates.length || Boolean(tradingSet[rowDateIso]);
-    if (!includeRow && selectedDateIsToday && rowDateIso === selectedDate) {
+    if (!includeRow && allowLiveSelectedDate && rowDateIso === selectedDate) {
       includeRow = true;
     }
 
@@ -260,7 +264,7 @@ function buildDashboardPayload_(context) {
     spreadsheetTitle: context.spreadsheet.getName(),
     selectedDate: selectedDate,
     selectedDateLabel: formatHumanDate_(selectedDate),
-    selectedDateIsTradingDay: Boolean(tradingSet[selectedDate]) || (selectedDateIsToday && rows.some(function (row) {
+    selectedDateIsTradingDay: Boolean(tradingSet[selectedDate]) || (allowLiveSelectedDate && rows.some(function (row) {
       return row.date === selectedDate;
     })),
     today: today,
@@ -672,6 +676,91 @@ function buildSheetDate_(dateIso) {
 
 function todayIsoKst_() {
   return Utilities.formatDate(new Date(), PP_SHEET_GATEWAY.timezone, 'yyyy-MM-dd');
+}
+
+function isKoreanRedDay_(dateIso) {
+  if (!dateIso) return false;
+  if (isWeekendIso_(dateIso)) return true;
+  return Boolean(getKoreanHolidaySet_()[dateIso]);
+}
+
+function isWeekendIso_(dateIso) {
+  if (!dateIso) return false;
+  var dayOfWeek = buildSheetDate_(dateIso).getDay();
+  return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
+function getKoreanHolidaySet_() {
+  var cacheKey = 'kr-holiday-set';
+  var cached = loadCachedValue_(cacheKey);
+  if (cached && typeof cached === 'object') {
+    return cached;
+  }
+
+  var response = UrlFetchApp.fetch(PP_SHEET_GATEWAY.holidayCalendarUrl, {
+    muteHttpExceptions: true,
+    followRedirects: true
+  });
+
+  if (response.getResponseCode() >= 400) {
+    throw createHttpError_(500, '대한민국 휴일 캘린더를 불러오지 못했습니다.');
+  }
+
+  var holidays = parseHolidayCalendarIcs_(response.getContentText());
+  saveCachedValue_(cacheKey, holidays, PP_SHEET_GATEWAY.holidayCacheHours);
+  return holidays;
+}
+
+function parseHolidayCalendarIcs_(text) {
+  var lines = unfoldIcsLines_(String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n'));
+  var holidays = {};
+  var inEvent = false;
+  var currentDate = '';
+
+  for (var i = 0; i < lines.length; i += 1) {
+    var line = String(lines[i] || '').trim();
+    if (line === 'BEGIN:VEVENT') {
+      inEvent = true;
+      currentDate = '';
+      continue;
+    }
+
+    if (line === 'END:VEVENT') {
+      if (currentDate) {
+        holidays[currentDate] = true;
+      }
+      inEvent = false;
+      currentDate = '';
+      continue;
+    }
+
+    if (!inEvent) continue;
+
+    if (line.indexOf('DTSTART') === 0) {
+      currentDate = normalizeIcsDate_(line.split(':').pop());
+    }
+  }
+
+  return holidays;
+}
+
+function unfoldIcsLines_(lines) {
+  var result = [];
+  for (var i = 0; i < lines.length; i += 1) {
+    var line = String(lines[i] || '');
+    if ((line.charAt(0) === ' ' || line.charAt(0) === '\t') && result.length) {
+      result[result.length - 1] += line.slice(1);
+      continue;
+    }
+    result.push(line);
+  }
+  return result;
+}
+
+function normalizeIcsDate_(value) {
+  var text = String(value || '').trim();
+  if (!/^\d{8}$/.test(text)) return '';
+  return text.slice(0, 4) + '-' + text.slice(4, 6) + '-' + text.slice(6, 8);
 }
 
 function formatHumanDate_(dateIso) {
