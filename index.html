@@ -175,13 +175,12 @@
   <script>
     const SHEET_ID = "1_vwuRC2LhZvRCf3r6Ub1I3s-RoPxGm8bn5kiUI-m8ik";
     const GID = "275556284";
-    const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json`;
+    const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&range=A:I`;
 
     const headEl = document.getElementById("table-head");
     const bodyEl = document.getElementById("table-body");
     const statusEl = document.getElementById("status");
     const refreshButton = document.getElementById("refresh-btn");
-    const DEFAULT_HEADERS = ["KOSPI", "005930", "000660", "042700", "066970", "047040", "", ""];
     const MAX_COLUMNS = 9; // A~I
 
     function cleanCellValue(cell) {
@@ -263,33 +262,75 @@
       return cloned;
     }
 
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let value = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < text.length; i += 1) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === "\"" && inQuotes && next === "\"") {
+          value += "\"";
+          i += 1;
+          continue;
+        }
+
+        if (char === "\"") {
+          inQuotes = !inQuotes;
+          continue;
+        }
+
+        if (char === "," && !inQuotes) {
+          row.push(value.trim());
+          value = "";
+          continue;
+        }
+
+        if ((char === "\n" || char === "\r") && !inQuotes) {
+          if (char === "\r" && next === "\n") i += 1;
+          row.push(value.trim());
+          rows.push(row);
+          row = [];
+          value = "";
+          continue;
+        }
+
+        value += char;
+      }
+
+      if (value.length || row.length) {
+        row.push(value.trim());
+        rows.push(row);
+      }
+
+      return rows;
+    }
+
     async function loadSheet() {
       setStatus("데이터 불러오는 중...");
 
       try {
-        const response = await fetch(GVIZ_URL);
+        const response = await fetch(CSV_URL);
         const raw = await response.text();
 
-        const jsonText = raw
-          .replace("/*O_o*/", "")
-          .replace(/google\.visualization\.Query\.setResponse\(/, "")
-          .replace(/\);\s*$/, "");
+        const rows = parseCsv(raw)
+          .map(normalizeRowLength)
+          .filter((row) => row.some((cell) => String(cell).trim() !== ""));
 
-        const parsed = JSON.parse(jsonText);
-        const rawRows = parsed.table.rows || [];
-        const colLabels = (parsed.table.cols || []).map((col) => String(col.label || "").trim());
-
-        const rows = rawRows
-          .map((row) => (row.c || []).map(cleanCellValue))
-          .filter((row) => row.some((cell) => cell !== ""));
-
-        const detectedTopDate = rows.find((row) => isDateText(row[0]))?.[0] || new Date().toISOString().slice(0, 10);
+        const topDateFromFirstRow = rows[0]?.[0];
+        const detectedTopDate = isDateText(topDateFromFirstRow)
+          ? topDateFromFirstRow
+          : (rows.find((row) => isDateText(row[0]))?.[0] || new Date().toISOString().slice(0, 10));
         const baseDate = normalizeDateString(detectedTopDate, new Date().getFullYear()) || new Date();
-        const sheetHeaderRow = rows.find((row) => row.some((cell) => String(cell).trim() === "KOSPI"));
-        const effectiveHeaders = (sheetHeaderRow ? sheetHeaderRow.slice(1, MAX_COLUMNS) : colLabels.slice(1, MAX_COLUMNS));
-        const headerRow = normalizeRowLength([detectedTopDate, ...(effectiveHeaders.length ? effectiveHeaders : DEFAULT_HEADERS)]);
+        const row2HeaderValues = rows[1] ? rows[1].slice(1, MAX_COLUMNS) : [];
+        const effectiveHeaders = row2HeaderValues;
+        const headerRow = normalizeRowLength([detectedTopDate, ...effectiveHeaders]);
 
         const dataRows = rows
+          .slice(2)
           .filter((row) => /^\d{2}[-./]\d{2}$/.test(String(row[0]).trim()))
           .map(normalizeRowLength)
           .filter((row) => {
