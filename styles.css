@@ -465,8 +465,10 @@ thead th:first-child {
   }
 
   .summary-head {
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
+    gap: 8px;
   }
 
   .status-stack,
@@ -476,7 +478,8 @@ thead th:first-child {
   }
 
   .summary-head .status-stack {
-    margin-left: auto;
+    margin-left: 0;
+    justify-self: end;
     text-align: right;
   }
 
