@@ -70,14 +70,13 @@ input {
 }
 
 .toolbar-card {
-  padding: 14px 18px;
+  padding: 10px 14px;
 }
 
 .toolbar-row {
   display: flex;
   justify-content: flex-start;
-  align-items: end;
-  gap: 12px;
+  align-items: center;
 }
 
 .section-head h2 {
@@ -86,12 +85,18 @@ input {
 }
 
 .compact-date-field {
-  display: grid;
-  gap: 6px;
-  min-width: min(320px, 100%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(280px, 100%);
+  min-width: 0;
   font-size: 12px;
   font-weight: 800;
   color: var(--muted);
+}
+
+.compact-date-field span {
+  flex: 0 0 auto;
 }
 
 .compact-date-field input,
@@ -107,14 +112,10 @@ input {
 }
 
 .compact-date-field input {
-  height: 46px;
-  padding: 0 14px;
-}
-
-.compact-button {
-  min-width: 112px;
-  min-height: 46px;
-  border-radius: 14px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
 }
 
 .compact-date-field input:focus,
@@ -488,12 +489,11 @@ thead th:first-child {
   }
 
   .toolbar-row {
-    flex-direction: column;
-    align-items: stretch;
+    align-items: center;
   }
 
   .compact-date-field {
-    min-width: 100%;
+    width: 100%;
   }
 
   .status-pill,
@@ -692,7 +692,7 @@ thead th:first-child {
   }
 
   .toolbar-card {
-    padding: 12px;
+    padding: 10px 12px;
   }
 
   .toolbar-row,
@@ -728,13 +728,8 @@ thead th:first-child {
   .primary-button,
   .ghost-button,
   .compact-date-field input {
-    min-height: 48px;
+    min-height: 42px;
     border-radius: 15px;
-  }
-
-  .compact-button,
-  .editor-row .primary-button {
-    width: 100%;
   }
 
   .date-badges {

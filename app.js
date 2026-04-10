@@ -13,7 +13,6 @@ const state = {
 
 const elements = {
   dateInput: document.getElementById("date-input"),
-  refreshButton: document.getElementById("refresh-button"),
   setupCard: document.getElementById("setup-card"),
   statusPill: document.getElementById("status-pill"),
   updatedAt: document.getElementById("updated-at"),
@@ -106,7 +105,6 @@ function getToneClass(value) {
 }
 
 function setBusyState(isBusy) {
-  elements.refreshButton.disabled = isBusy;
   elements.dateInput.disabled = isBusy;
   document.querySelectorAll(".slot-input").forEach((input) => {
     input.disabled = isBusy || input.dataset.editable !== "true";
@@ -463,12 +461,6 @@ async function saveTickers() {
 }
 
 function bindEvents() {
-  elements.refreshButton.addEventListener("click", () => {
-    loadDashboard(elements.dateInput.value || getTodayKstDate()).catch((error) => {
-      setStatus(error.message, "error");
-    });
-  });
-
   elements.dateInput.addEventListener("change", () => {
     loadDashboard(elements.dateInput.value || getTodayKstDate()).catch((error) => {
       setStatus(error.message, "error");
