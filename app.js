@@ -252,10 +252,8 @@ function renderSlots(slots) {
   elements.slotGrid.innerHTML = slots.map((slot, index) => {
     const isFixed = !slot.editable;
     const totalText = `합계 ${formatPercent(Number(slot.total), 2)}`;
-    const caption = isFixed ? "기준 지수" : `선택 종목 ${index}`;
     return `
       <article class="slot-card${isFixed ? " is-fixed" : ""}" data-slot-index="${index}">
-        <p class="slot-caption">${caption}</p>
         <h3 class="slot-name">${escapeHtml(slot.name || slot.code || "종목명 확인 필요")}</h3>
         <input
           class="slot-input"

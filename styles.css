@@ -258,7 +258,7 @@ input {
 .slot-card {
   position: relative;
   overflow: hidden;
-  min-height: 180px;
+  min-height: 156px;
   padding: 18px;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(15, 23, 42, 0.07);
@@ -266,7 +266,8 @@ input {
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 250, 252, 0.88)),
     linear-gradient(130deg, rgba(0, 95, 115, 0.06), transparent 45%);
   display: grid;
-  gap: 12px;
+  align-content: start;
+  gap: 10px;
 }
 
 .slot-card::after {
@@ -287,23 +288,18 @@ input {
 }
 
 .slot-card.is-fixed .slot-name,
-.slot-card.is-fixed .slot-caption,
 .slot-card.is-fixed .slot-total,
-.slot-card.is-fixed .slot-caption strong {
+.slot-card.is-fixed .slot-input {
+  color: #fff;
+}
+
+.slot-card.is-fixed .slot-total {
   color: inherit;
 }
 
 .slot-card.is-fixed .slot-input {
   background: rgba(255, 255, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.18);
-  color: #fff;
-}
-
-.slot-caption {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
 }
 
 .slot-name {
@@ -327,8 +323,8 @@ input {
 }
 
 .editor-row {
-  margin-top: 18px;
-  padding-top: 18px;
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid rgba(15, 23, 42, 0.06);
   display: flex;
   justify-content: space-between;
@@ -477,7 +473,7 @@ thead th:first-child {
   }
 
   .slot-card {
-    min-height: 164px;
+    min-height: 148px;
   }
 
   table {
@@ -604,8 +600,8 @@ thead th:first-child {
 
   .slot-card {
     min-height: auto;
-    padding: 16px;
-    gap: 10px;
+    padding: 15px;
+    gap: 9px;
   }
 
   .slot-grid {
