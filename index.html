@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KOSPI 등락률 대시보드</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --header: #111827;
+      --up: #d45a00;
+      --down: #1d4ed8;
+      --accent: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", Arial, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top, #eaf1ff 0%, var(--bg) 45%);
+      padding: 32px 16px;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid #edf1f7;
+      border-radius: 16px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 22px 24px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      color: var(--header);
+    }
+
+    .sub {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      font-size: 13px;
+      color: var(--muted);
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      padding: 7px 10px;
+      border-radius: 999px;
+    }
+
+    .status.error {
+      color: #b91c1c;
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+
+    button {
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      padding: 9px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      filter: brightness(1.05);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 15px;
+    }
+
+    th,
+    td {
+      text-align: center;
+      border-bottom: 1px solid var(--line);
+      padding: 12px 10px;
+      white-space: nowrap;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      color: #374151;
+      font-weight: 700;
+      z-index: 1;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #fcfdff;
+    }
+
+    tbody tr:hover {
+      background: #eef4ff;
+    }
+
+    td:first-child,
+    th:first-child {
+      font-weight: 700;
+      color: #374151;
+    }
+
+    .up { color: var(--up); font-weight: 700; }
+    .down { color: var(--down); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="card" aria-label="KOSPI 및 종목별 일자별 등락률">
+      <header class="card-header">
+        <div>
+          <h1>KOSPI 등락률 대시보드</h1>
+          <p class="sub">구글 스프레드시트 값이 바뀌면 이 표도 자동으로 반영됩니다.</p>
+        </div>
+        <div class="actions">
+          <p id="status" class="status">데이터 불러오는 중...</p>
+          <button id="refresh-btn" type="button">새로고침</button>
+        </div>
+      </header>
+
+      <div class="table-wrap">
+        <table>
+          <thead id="table-head"></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const SHEET_ID = "1_vwuRC2LhZvRCf3r6Ub1I3s-RoPxGm8bn5kiUI-m8ik";
+    const GID = "275556284";
+    const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&range=A:I`;
+    const GVIZ_JSONP_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&range=A:I&tqx=out:json;responseHandler=__sheetCallback`;
+
+    const headEl = document.getElementById("table-head");
+    const bodyEl = document.getElementById("table-body");
+    const statusEl = document.getElementById("status");
+    const refreshButton = document.getElementById("refresh-btn");
+    const MAX_COLUMNS = 9; // A~I
+
+    function cleanCellValue(cell) {
+      if (!cell) return "";
+      if (typeof cell.f === "string") return cell.f;
+      if (cell.v === null || cell.v === undefined) return "";
+      return String(cell.v);
+    }
+
+    function parseRate(valueText) {
+      const rate = Number(String(valueText).replace("%", "").trim());
+      return Number.isFinite(rate) ? rate : null;
+    }
+
+    function applyRateClass(cellEl, valueText) {
+      const rate = parseRate(valueText);
+      if (rate === null) return;
+      if (rate > 0) cellEl.classList.add("up");
+      if (rate < 0) cellEl.classList.add("down");
+    }
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.className = isError ? "status error" : "status";
+    }
+
+    function renderTable(headerRow, rows) {
+      headEl.innerHTML = "";
+      bodyEl.innerHTML = "";
+
+      if (!rows.length) {
+        throw new Error("표시할 데이터가 없습니다.");
+      }
+
+      const headerTr = document.createElement("tr");
+      headerRow.forEach((text) => {
+        const th = document.createElement("th");
+        th.textContent = text;
+        headerTr.appendChild(th);
+      });
+      headEl.appendChild(headerTr);
+
+      rows.forEach((row) => {
+        const tr = document.createElement("tr");
+        row.forEach((text, index) => {
+          const td = document.createElement("td");
+          td.textContent = text;
+          if (index > 0) applyRateClass(td, text);
+          tr.appendChild(td);
+        });
+        bodyEl.appendChild(tr);
+      });
+    }
+
+    function isDateText(value) {
+      return /^(?:\d{4}[-./]\d{1,2}[-./]\d{1,2}|\d{2}[-./]\d{2})$/.test(String(value).trim());
+    }
+
+    function normalizeDateString(value, yearHint) {
+      const raw = String(value).trim().replace(/\./g, "-").replace(/\//g, "-");
+      if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) {
+        const [y, m, d] = raw.split("-").map(Number);
+        return new Date(y, m - 1, d);
+      }
+      if (/^\d{2}-\d{2}$/.test(raw)) {
+        const [m, d] = raw.split("-").map(Number);
+        return new Date(yearHint, m - 1, d);
+      }
+      return null;
+    }
+
+    function hasRateValue(row) {
+      return row.slice(1).some((cell) => parseRate(cell) !== null);
+    }
+
+    function normalizeRowLength(row) {
+      const cloned = row.slice(0, MAX_COLUMNS);
+      while (cloned.length < MAX_COLUMNS) cloned.push("");
+      return cloned;
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let value = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < text.length; i += 1) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === "\"" && inQuotes && next === "\"") {
+          value += "\"";
+          i += 1;
+          continue;
+        }
+
+        if (char === "\"") {
+          inQuotes = !inQuotes;
+          continue;
+        }
+
+        if (char === "," && !inQuotes) {
+          row.push(value.trim());
+          value = "";
+          continue;
+        }
+
+        if ((char === "\n" || char === "\r") && !inQuotes) {
+          if (char === "\r" && next === "\n") i += 1;
+          row.push(value.trim());
+          rows.push(row);
+          row = [];
+          value = "";
+          continue;
+        }
+
+        value += char;
+      }
+
+      if (value.length || row.length) {
+        row.push(value.trim());
+        rows.push(row);
+      }
+
+      return rows;
+    }
+
+    function rowsFromGvizResponse(gviz) {
+      const rawRows = gviz?.table?.rows || [];
+      return rawRows
+        .map((row) => (row.c || []).map(cleanCellValue))
+        .map(normalizeRowLength)
+        .filter((row) => row.some((cell) => String(cell).trim() !== ""));
+    }
+
+    function loadRowsByJsonp() {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        const callbackName = "__sheetCallback";
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error("JSONP 응답 시간 초과"));
+        }, 10000);
+
+        function cleanup() {
+          clearTimeout(timeout);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = (response) => {
+          try {
+            const rows = rowsFromGvizResponse(response);
+            cleanup();
+            resolve(rows);
+          } catch (error) {
+            cleanup();
+            reject(error);
+          }
+        };
+
+        script.onerror = () => {
+          cleanup();
+          reject(new Error("JSONP 로드 실패"));
+        };
+
+        script.src = GVIZ_JSONP_URL;
+        document.body.appendChild(script);
+      });
+    }
+
+    async function loadSheet() {
+      setStatus("데이터 불러오는 중...");
+
+      try {
+        let rows = [];
+
+        try {
+          rows = await loadRowsByJsonp();
+        } catch (jsonpError) {
+          const response = await fetch(CSV_URL);
+          const raw = await response.text();
+          rows = parseCsv(raw)
+            .map(normalizeRowLength)
+            .filter((row) => row.some((cell) => String(cell).trim() !== ""));
+        }
+
+        const topDateFromFirstRow = rows[0]?.[0];
+        const detectedTopDate = isDateText(topDateFromFirstRow)
+          ? topDateFromFirstRow
+          : (rows.find((row) => isDateText(row[0]))?.[0] || new Date().toISOString().slice(0, 10));
+        const baseDate = normalizeDateString(detectedTopDate, new Date().getFullYear()) || new Date();
+        const row2HeaderValues = rows[1] ? rows[1].slice(1, MAX_COLUMNS) : [];
+        const headerRow = normalizeRowLength([detectedTopDate, ...row2HeaderValues]);
+
+        const dataRows = rows
+          .slice(2)
+          .filter((row) => /^\d{2}[-./]\d{2}$/.test(String(row[0]).trim()))
+          .map(normalizeRowLength)
+          .filter((row) => {
+            const date = normalizeDateString(row[0], baseDate.getFullYear());
+            if (!date) return false;
+            const day = date.getDay();
+            const isWeekend = day === 0 || day === 6;
+            if (isWeekend) return false;
+            return hasRateValue(row);
+          });
+
+        renderTable(headerRow, dataRows);
+        setStatus(`마지막 동기화: ${new Date().toLocaleString("ko-KR")}`);
+      } catch (error) {
+        setStatus(`불러오기 실패: ${error.message}`, true);
+      }
+    }
+
+    refreshButton.addEventListener("click", loadSheet);
+    loadSheet();
+  </script>
+</body>
+</html>
