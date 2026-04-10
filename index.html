@@ -181,7 +181,7 @@
     const bodyEl = document.getElementById("table-body");
     const statusEl = document.getElementById("status");
     const refreshButton = document.getElementById("refresh-btn");
-    const DEFAULT_HEADERS = ["KOSPI", "005930", "000660", "042700", "066970", "047040", "H열", "I열"];
+    const DEFAULT_HEADERS = ["KOSPI", "005930", "000660", "042700", "066970", "047040", "", ""];
     const MAX_COLUMNS = 9; // A~I
 
     function cleanCellValue(cell) {
@@ -257,6 +257,12 @@
       return row.slice(1).some((cell) => parseRate(cell) !== null);
     }
 
+    function normalizeRowLength(row) {
+      const cloned = row.slice(0, MAX_COLUMNS);
+      while (cloned.length < MAX_COLUMNS) cloned.push("");
+      return cloned;
+    }
+
     async function loadSheet() {
       setStatus("데이터 불러오는 중...");
 
@@ -279,12 +285,13 @@
 
         const detectedTopDate = rows.find((row) => isDateText(row[0]))?.[0] || new Date().toISOString().slice(0, 10);
         const baseDate = normalizeDateString(detectedTopDate, new Date().getFullYear()) || new Date();
-        const effectiveHeaders = colLabels.slice(1, MAX_COLUMNS).filter(Boolean);
-        const headerRow = [detectedTopDate, ...(effectiveHeaders.length ? effectiveHeaders : DEFAULT_HEADERS)].slice(0, MAX_COLUMNS);
+        const sheetHeaderRow = rows.find((row) => row.some((cell) => String(cell).trim() === "KOSPI"));
+        const effectiveHeaders = (sheetHeaderRow ? sheetHeaderRow.slice(1, MAX_COLUMNS) : colLabels.slice(1, MAX_COLUMNS));
+        const headerRow = normalizeRowLength([detectedTopDate, ...(effectiveHeaders.length ? effectiveHeaders : DEFAULT_HEADERS)]);
 
         const dataRows = rows
           .filter((row) => /^\d{2}[-./]\d{2}$/.test(String(row[0]).trim()))
-          .map((row) => row.slice(0, MAX_COLUMNS))
+          .map(normalizeRowLength)
           .filter((row) => {
             const date = normalizeDateString(row[0], baseDate.getFullYear());
             if (!date) return false;
