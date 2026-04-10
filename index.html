@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>주가 등락률 표</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #fff;
+    }
+
+    .sheet {
+      border-collapse: collapse;
+      table-layout: fixed;
+      width: 710px;
+      background: #dcdcdc;
+      font-size: 24px;
+    }
+
+    .sheet th,
+    .sheet td {
+      border: 2px solid #333;
+      text-align: center;
+      height: 44px;
+      color: #1f1f1f;
+      padding: 0;
+      font-weight: 400;
+    }
+
+    .sheet thead th {
+      font-weight: 500;
+    }
+
+    .date {
+      width: 140px;
+    }
+
+    .up {
+      color: #d45a00 !important;
+    }
+
+    .down {
+      color: #002cff !important;
+    }
+
+    .loading,
+    .error {
+      margin-top: 12px;
+      font-size: 16px;
+    }
+
+    .error {
+      color: #c00000;
+    }
+  </style>
+</head>
+<body>
+  <table class="sheet" aria-label="KOSPI 및 종목별 일자별 등락률">
+    <thead id="table-head"></thead>
+    <tbody id="table-body"></tbody>
+  </table>
+
+  <p id="status" class="loading">스프레드시트 데이터 불러오는 중...</p>
+
+  <script>
+    const SHEET_ID = "1_vwuRC2LhZvRCf3r6Ub1I3s-RoPxGm8bn5kiUI-m8ik";
+    const GID = "275556284";
+    const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json`;
+
+    const headEl = document.getElementById("table-head");
+    const bodyEl = document.getElementById("table-body");
+    const statusEl = document.getElementById("status");
+
+    function cleanCellValue(cell) {
+      if (!cell) return "";
+      if (typeof cell.f === "string") return cell.f;
+      if (cell.v === null || cell.v === undefined) return "";
+      return String(cell.v);
+    }
+
+    function parseRate(valueText) {
+      const normalized = valueText.replace("%", "").trim();
+      const rate = Number(normalized);
+      return Number.isFinite(rate) ? rate : null;
+    }
+
+    function applyRateClass(cellEl, valueText) {
+      const rate = parseRate(valueText);
+      if (rate === null) return;
+      if (rate > 0) cellEl.classList.add("up");
+      if (rate < 0) cellEl.classList.add("down");
+    }
+
+    function renderTable(rows) {
+      headEl.innerHTML = "";
+      bodyEl.innerHTML = "";
+
+      if (!rows.length) {
+        throw new Error("표시할 데이터가 없습니다.");
+      }
+
+      const headerRow = rows[0];
+      const headerTr = document.createElement("tr");
+
+      headerRow.forEach((text, index) => {
+        const th = document.createElement("th");
+        th.textContent = text;
+        if (index === 0) th.classList.add("date");
+        headerTr.appendChild(th);
+      });
+
+      headEl.appendChild(headerTr);
+
+      rows.slice(1).forEach((row) => {
+        const tr = document.createElement("tr");
+
+        row.forEach((text, index) => {
+          const td = document.createElement("td");
+          td.textContent = text;
+
+          if (index > 0) {
+            applyRateClass(td, text);
+          }
+
+          tr.appendChild(td);
+        });
+
+        bodyEl.appendChild(tr);
+      });
+    }
+
+    async function loadSheet() {
+      try {
+        const response = await fetch(GVIZ_URL);
+        const raw = await response.text();
+
+        const jsonText = raw
+          .replace("/*O_o*/", "")
+          .replace(/google\.visualization\.Query\.setResponse\(/, "")
+          .replace(/\);\s*$/, "");
+
+        const parsed = JSON.parse(jsonText);
+        const rawRows = parsed.table.rows || [];
+
+        const rows = rawRows
+          .map((row) => (row.c || []).map(cleanCellValue))
+          .filter((row) => row.some((cell) => cell !== ""));
+
+        renderTable(rows);
+        statusEl.textContent = `마지막 동기화: ${new Date().toLocaleString("ko-KR")}`;
+        statusEl.className = "loading";
+      } catch (error) {
+        statusEl.textContent = `데이터를 불러오지 못했습니다: ${error.message}`;
+        statusEl.className = "error";
+      }
+    }
+
+    loadSheet();
+  </script>
+</body>
+</html>
