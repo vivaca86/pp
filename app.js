@@ -106,6 +106,12 @@ function getSlotCaption(slot) {
   return "종목 입력 필요";
 }
 
+function getSlotMarketLabel(slot) {
+  if (!slot) return "-";
+  if (!slot.editable) return "기준 지수";
+  return String(slot.market || "시장 확인 필요").trim().toUpperCase();
+}
+
 function getBenchmarkIndexForSlot(slots, slot) {
   if (!slot || !Array.isArray(slots) || !slots.length) return 0;
 
@@ -277,6 +283,7 @@ function renderSlots(slots) {
     return `
       <article class="slot-card${isFixed ? " is-fixed" : ""}" data-slot-index="${index}">
         <h3 class="slot-name">${escapeHtml(slot.name || slot.code || "종목명 확인 필요")}</h3>
+        <p class="slot-market">${escapeHtml(getSlotMarketLabel(slot))}</p>
         <input
           class="slot-input"
           type="text"
