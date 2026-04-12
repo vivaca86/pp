@@ -5,6 +5,8 @@ var PP_SHEET_GATEWAY = {
   controlSheetName: '시트2',
   indexSheetName: '시트3',
   controlRangeA1: 'A2:I40',
+  tickerRangeA1: 'D2:I2',
+  editableTickerCount: 6,
   indexDateRangeA1: 'B3:B80',
   catalogCacheHours: 24,
   holidayCacheHours: 12,
@@ -157,10 +159,10 @@ function setSelectedDate_(controlSheet, dateIso) {
 }
 
 function setTickerCodes_(controlSheet, codes) {
-  if (!Array.isArray(codes) || codes.length !== 7) {
-    throw createHttpError_(400, '티커는 정확히 7개여야 합니다.');
+  if (!Array.isArray(codes) || codes.length !== PP_SHEET_GATEWAY.editableTickerCount) {
+    throw createHttpError_(400, '티커는 정확히 ' + PP_SHEET_GATEWAY.editableTickerCount + '개여야 합니다.');
   }
-  controlSheet.getRange('C2:I2').setValues([codes]);
+  controlSheet.getRange(PP_SHEET_GATEWAY.tickerRangeA1).setValues([codes]);
   SpreadsheetApp.flush();
 }
 
@@ -283,12 +285,19 @@ function buildSlotPayloads_(headerRow) {
       editable: false,
       code: 'KOSPI',
       name: '코스피',
-      market: 'INDEX',
+      market: 'KOSPI',
+      total: 0
+    },
+    {
+      editable: false,
+      code: 'KOSDAQ',
+      name: '코스닥',
+      market: 'KOSDAQ',
       total: 0
     }
   ];
 
-  for (var columnIndex = 2; columnIndex < 9; columnIndex += 1) {
+  for (var columnIndex = 3; columnIndex < 9; columnIndex += 1) {
     var code = sanitizeStockCode_(headerRow[columnIndex]);
     var matched = code ? findStockByCode_(code) : null;
     slots.push({
@@ -329,7 +338,7 @@ function hasTradingDataForMonth_(indexSheet, monthKey) {
 }
 
 function getTickerCodes_(controlSheet) {
-  return controlSheet.getRange('C2:I2').getDisplayValues()[0].map(function (value) {
+  return controlSheet.getRange(PP_SHEET_GATEWAY.tickerRangeA1).getDisplayValues()[0].map(function (value) {
     return sanitizeStockCode_(value);
   });
 }
@@ -344,8 +353,8 @@ function parseTickerList_(text) {
       return Boolean(item);
     });
 
-  if (items.length !== 7) {
-    throw createHttpError_(400, 'tickers 파라미터는 쉼표로 구분된 7개 값이어야 합니다.');
+  if (items.length !== PP_SHEET_GATEWAY.editableTickerCount) {
+    throw createHttpError_(400, 'tickers 파라미터는 쉼표로 구분된 ' + PP_SHEET_GATEWAY.editableTickerCount + '개 값이어야 합니다.');
   }
 
   return items;

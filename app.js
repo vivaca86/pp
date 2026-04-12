@@ -1,5 +1,5 @@
 const MARKET_TIMEZONE = "Asia/Seoul";
-const SLOT_COUNT = 7;
+const SLOT_COUNT = 6;
 const DEFAULT_GATEWAY_URL = String(window.PP_CONFIG?.gatewayUrl || "").trim();
 
 const state = {
@@ -45,19 +45,9 @@ function getTodayKstDate() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function formatFullDate(dateText) {
-  if (!dateText) return "-";
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: MARKET_TIMEZONE,
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short"
-  }).format(new Date(`${dateText}T12:00:00+09:00`));
-}
-
 function formatTimestamp(dateText) {
   if (!dateText) return "-";
+
   return new Intl.DateTimeFormat("ko-KR", {
     timeZone: MARKET_TIMEZONE,
     year: "numeric",
@@ -109,6 +99,24 @@ function getSlotDisplayLabel(slot) {
   return slot.name || slot.code || "-";
 }
 
+function getSlotCaption(slot) {
+  if (!slot) return "";
+  if (!slot.editable) return `${slot.market || "INDEX"} · ${slot.code || "-"}`;
+  if (slot.market && slot.code) return `${slot.market} · ${slot.code}`;
+  return "종목 입력 필요";
+}
+
+function getBenchmarkIndexForSlot(slots, slot) {
+  if (!slot || !Array.isArray(slots) || !slots.length) return 0;
+
+  const targetCode = String(slot.market || "").trim().toUpperCase() === "KOSDAQ"
+    ? "KOSDAQ"
+    : "KOSPI";
+
+  const matchedIndex = slots.findIndex((item) => String(item.code || "").trim().toUpperCase() === targetCode);
+  return matchedIndex >= 0 ? matchedIndex : 0;
+}
+
 function formatDeltaPercent(baseValue, compareValue) {
   if (!Number.isFinite(baseValue) || !Number.isFinite(compareValue)) return "-";
   return formatPercent(compareValue - baseValue, 2);
@@ -137,11 +145,13 @@ function ensureGatewayReady() {
 
 function buildRequestUrl(params) {
   const url = new URL(state.gatewayUrl);
+
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       url.searchParams.set(key, value);
     }
   });
+
   return url.toString();
 }
 
@@ -175,6 +185,7 @@ function buildTickerDatalist(items) {
 
 async function loadCatalog() {
   if (!ensureGatewayReady()) return;
+
   const payload = await requestGateway({ action: "stock-catalog", market: "ALL" });
   state.catalog = Array.isArray(payload.items) ? payload.items : [];
   buildTickerDatalist(state.catalog);
@@ -216,13 +227,14 @@ function resolveTickerInput(rawValue) {
   });
 
   if (fuzzyMatch) return fuzzyMatch.code;
-  throw new Error(`종목을 찾지 못했습니다: ${input}`);
+  throw new Error(`종목을 찾지 못했습니다. ${input}`);
 }
 
 function updateSlotPreview(slotCard) {
   const input = slotCard.querySelector(".slot-input");
   const nameEl = slotCard.querySelector(".slot-name");
   const raw = input?.value || "";
+
   if (!input || !nameEl || input.dataset.editable !== "true") return;
 
   const match = findCatalogItem(raw);
@@ -248,12 +260,11 @@ function attachSlotEvents() {
       });
     });
     input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        saveTickers().catch((error) => {
-          setStatus(error.message, "error");
-        });
-      }
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      saveTickers().catch((error) => {
+        setStatus(error.message, "error");
+      });
     });
   });
 }
@@ -262,6 +273,7 @@ function renderSlots(slots) {
   elements.slotGrid.innerHTML = slots.map((slot, index) => {
     const isFixed = !slot.editable;
     const totalText = `합계 ${formatPercent(Number(slot.total), 2)}`;
+
     return `
       <article class="slot-card${isFixed ? " is-fixed" : ""}" data-slot-index="${index}">
         <h3 class="slot-name">${escapeHtml(slot.name || slot.code || "종목명 확인 필요")}</h3>
@@ -275,7 +287,9 @@ function renderSlots(slots) {
           autocomplete="off"
           spellcheck="false"
         >
-        <p class="slot-total ${getToneClass(Number(slot.total))}">${escapeHtml(totalText)}</p>
+        <p class="slot-total ${getToneClass(Number(slot.total))}" title="${escapeHtml(getSlotCaption(slot))}">
+          ${escapeHtml(totalText)}
+        </p>
       </article>
     `;
   }).join("");
@@ -297,7 +311,7 @@ function renderTable(payload) {
 
   elements.tableBody.innerHTML = rows.map((row) => `
     <tr>
-      <td data-label="Date">${escapeHtml(row.displayDate || row.date || "-")}</td>
+      <td data-label="날짜">${escapeHtml(row.displayDate || row.date || "-")}</td>
       ${row.values.map((cell, index) => `
         <td data-label="${escapeHtml(columnLabels[index] || "-")}" class="${getToneClass(Number(cell.value))}">
           ${escapeHtml(cell.display || "-")}
@@ -310,19 +324,15 @@ function renderTable(payload) {
 }
 
 function getMobileCompareEntries(slots) {
-  const benchmarkIndex = slots.findIndex((slot) => slot.editable === false);
-  const safeBenchmarkIndex = benchmarkIndex >= 0 ? benchmarkIndex : 0;
-  const benchmarkSlot = slots[safeBenchmarkIndex];
-  const compareEntries = slots
+  return slots
     .map((slot, index) => ({ slot, index }))
-    .filter((entry) => entry.index !== safeBenchmarkIndex);
-
-  return { benchmarkSlot, benchmarkIndex: safeBenchmarkIndex, compareEntries };
+    .filter((entry) => entry.slot?.editable && Boolean(entry.slot.code));
 }
 
 function updateMobileCompareNavigation(totalSlides) {
   const hasSlides = totalSlides > 0;
   const hasMultiple = totalSlides > 1;
+
   elements.mobileCompare.hidden = !hasSlides;
   elements.mobileCompareControls.hidden = !hasMultiple;
   elements.mobileCompareDots.hidden = !hasMultiple;
@@ -365,9 +375,9 @@ function scrollMobileCompareTo(index, smooth = true) {
 function renderMobileCompare(payload) {
   const slots = Array.isArray(payload.slots) ? payload.slots : [];
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
-  const { benchmarkSlot, benchmarkIndex, compareEntries } = getMobileCompareEntries(slots);
+  const compareEntries = getMobileCompareEntries(slots);
 
-  if (!benchmarkSlot || !compareEntries.length || !rows.length) {
+  if (!compareEntries.length || !rows.length) {
     elements.mobileCompareTrack.innerHTML = "";
     updateMobileCompareNavigation(0);
     return;
@@ -377,6 +387,8 @@ function renderMobileCompare(payload) {
 
   elements.mobileCompareTrack.innerHTML = compareEntries.map((entry, slideIndex) => {
     const compareSlot = entry.slot;
+    const benchmarkIndex = getBenchmarkIndexForSlot(slots, compareSlot);
+    const benchmarkSlot = slots[benchmarkIndex];
     const title = compareSlot.name || compareSlot.code || "종목";
     const benchmarkLabel = getSlotDisplayLabel(benchmarkSlot);
     const compareLabel = getSlotDisplayLabel(compareSlot);
@@ -389,7 +401,7 @@ function renderMobileCompare(payload) {
 
         <div class="mobile-compare-grid">
           <div class="mobile-compare-row is-head">
-            <span>일자</span>
+            <span>날짜</span>
             <span>${escapeHtml(benchmarkLabel)}</span>
             <span>${escapeHtml(compareLabel)}</span>
             <span>차이</span>
@@ -401,6 +413,7 @@ function renderMobileCompare(payload) {
             const compareValue = Number.isFinite(compareCell.value) ? compareCell.value : NaN;
             const differenceText = formatDeltaPercent(benchmarkValue, compareValue);
             const differenceTone = differenceText === "-" ? "tone-neutral" : getToneClass(compareValue - benchmarkValue);
+
             return `
               <div class="mobile-compare-row">
                 <span class="mobile-compare-date">${escapeHtml(row.displayDate || row.date || "-")}</span>
@@ -427,6 +440,7 @@ function renderDashboard(payload) {
   elements.dateInput.value = payload.selectedDate || "";
   elements.dateInput.max = payload.today || getTodayKstDate();
   elements.updatedAt.textContent = `마지막 동기화 ${formatTimestamp(payload.updatedAt)}`;
+
   renderSlots(payload.slots || []);
   renderTable(payload);
   renderMobileCompare(payload);
@@ -453,12 +467,12 @@ async function saveTickers() {
 
   state.saving = true;
   setBusyState(true);
-  setStatus("티커 저장 중", "loading");
+  setStatus("종목 저장 중", "loading");
 
   try {
     const tickerInputs = [...document.querySelectorAll(".slot-input[data-editable='true']")];
     if (tickerInputs.length !== SLOT_COUNT) {
-      throw new Error("편집 가능한 티커 입력창을 모두 찾지 못했습니다.");
+      throw new Error("편집 가능한 종목 입력칸을 모두 찾지 못했습니다.");
     }
 
     const tickers = tickerInputs.map((input) => resolveTickerInput(input.value));
@@ -469,7 +483,7 @@ async function saveTickers() {
     });
 
     renderDashboard(payload);
-    setStatus("티커 저장 완료", "success");
+    setStatus("종목 저장 완료", "success");
   } finally {
     state.saving = false;
     setBusyState(false);
