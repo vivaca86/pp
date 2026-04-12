@@ -279,11 +279,11 @@ function renderSlots(slots) {
   elements.slotGrid.innerHTML = slots.map((slot, index) => {
     const isFixed = !slot.editable;
     const totalText = `합계 ${formatPercent(Number(slot.total), 2)}`;
+    const marketLabel = getSlotMarketLabel(slot);
 
     return `
       <article class="slot-card${isFixed ? " is-fixed" : ""}" data-slot-index="${index}">
         <h3 class="slot-name">${escapeHtml(slot.name || slot.code || "종목명 확인 필요")}</h3>
-        <p class="slot-market">${escapeHtml(getSlotMarketLabel(slot))}</p>
         <input
           class="slot-input"
           type="text"
@@ -294,9 +294,12 @@ function renderSlots(slots) {
           autocomplete="off"
           spellcheck="false"
         >
-        <p class="slot-total ${getToneClass(Number(slot.total))}" title="${escapeHtml(getSlotCaption(slot))}">
-          ${escapeHtml(totalText)}
-        </p>
+        <div class="slot-footer" title="${escapeHtml(getSlotCaption(slot))}">
+          <p class="slot-total ${getToneClass(Number(slot.total))}">
+            ${escapeHtml(totalText)}
+          </p>
+          <p class="slot-market">${escapeHtml(marketLabel)}</p>
+        </div>
       </article>
     `;
   }).join("");

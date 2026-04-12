@@ -295,6 +295,7 @@ input {
 .slot-card.is-fixed .slot-name,
 .slot-card.is-fixed .slot-market,
 .slot-card.is-fixed .slot-total,
+.slot-card.is-fixed .slot-footer,
 .slot-card.is-fixed .slot-input {
   color: #fff;
 }
@@ -321,10 +322,8 @@ input {
 }
 
 .slot-market {
-  margin: -2px 0 2px;
   display: inline-flex;
   align-items: center;
-  justify-self: start;
   min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
@@ -340,6 +339,14 @@ input {
   height: 48px;
   padding: 0 14px;
   font-weight: 700;
+}
+
+.slot-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .slot-total {
