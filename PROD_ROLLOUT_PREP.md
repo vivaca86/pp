@@ -29,7 +29,7 @@ Production local code is aligned with the tested implementation, and the product
 ## Current live status
 - Live backend `/exec` URL:
   `https://script.google.com/macros/s/AKfycbwTTTBD3kVxTvxOFIqIi-TsnZsZr-ugZNylfSCXChGunqO-q-zQmBaTU_YCCqkZf_dvTw/exec`
-- Latest deployed backend version: `@14`
+- Latest deployed backend version: `@15`
 - Verified on `2026-04-13`:
   - `action=health` works
   - `action=dashboard-data` works
@@ -45,7 +45,7 @@ Production local code is aligned with the tested implementation, and the product
   - scoped token cache has been added so mock/prod tokens do not get mixed
 - Remaining temporary product decision:
   - `ALL` is removed from the production recommendation UI for now
-- Production static front-end has **not** been pushed yet.
+- Production static front-end has been pushed to `origin/main`.
 
 ## Production prerequisites
 
@@ -124,4 +124,4 @@ Recommendation rollout is now **ready for single-universe production use** with 
 `ALL` remains intentionally disabled in the production UI for stability.
 
 ## Immediate next step
-Push the static production frontend with `KOSPI200 / KOSDAQ150` only, then run the final public smoke checklist.
+Wait for GitHub Pages propagation if needed, then run the final public smoke checklist on the live site.
