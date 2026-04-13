@@ -1726,9 +1726,10 @@ function renderTable(payload) {
 function getMobileSlides(payload) {
   return payload.slots
     .map((slot, index) => ({ slot, index }))
-    .filter((entry) => entry.slot.editable && entry.slot.stock)
+    .filter((entry) => entry.slot.editable && (entry.slot.code || entry.slot.name))
     .map((entry) => {
-      const benchmarkIndex = entry.slot.stock.market === "KOSDAQ" ? 1 : 0;
+      const slotStock = entry.slot.stock || enrichStockMeta(entry.slot);
+      const benchmarkIndex = slotStock?.market === "KOSDAQ" ? 1 : 0;
       const benchmarkSlot = payload.slots[benchmarkIndex];
       const compareRows = payload.rows.filter((row) => {
         const benchmarkCell = row.values[benchmarkIndex];
@@ -1737,9 +1738,9 @@ function getMobileSlides(payload) {
       });
 
       return {
-        title: entry.slot.stock.name,
+        title: slotStock?.name || getSlotDisplayLabel(entry.slot),
         benchmarkLabel: getSlotDisplayLabel(benchmarkSlot),
-        compareLabel: entry.slot.stock.name,
+        compareLabel: slotStock?.name || getSlotDisplayLabel(entry.slot),
         benchmarkIndex,
         compareIndex: entry.index,
         rows: compareRows
