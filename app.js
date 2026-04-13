@@ -355,8 +355,8 @@ function getRecommendationFilters() {
     mode: String(elements.recommendationMode?.value || "near").trim().toLowerCase(),
     lookbackDays: Number(elements.recommendationLookback?.value || 1),
     tolerance: Number(elements.recommendationTolerance?.value || 0.01),
-    sortBy: String(elements.recommendationSort?.value || "distance_abs").trim().toLowerCase(),
-    slotTarget: String(elements.recommendationSlotTarget?.value || "auto").trim().toLowerCase()
+    sortBy: "distance_abs",
+    slotTarget: "auto"
   };
 }
 
@@ -527,6 +527,11 @@ function applyStaticUiText() {
   updateOptionText(elements.recommendationSort, "distance_desc", "상단 괴리 우선");
   updateOptionText(elements.recommendationSort, "distance_asc", "하단 괴리 우선");
   updateOptionText(elements.recommendationSort, "name", "종목명 순");
+
+  const sortField = recommendationSection?.querySelector("label[for='recommendation-sort']");
+  const slotTargetField = recommendationSection?.querySelector("label[for='recommendation-slot-target']");
+  if (sortField) sortField.hidden = true;
+  if (slotTargetField) slotTargetField.hidden = true;
 
   setRecommendationSummaryVisibility(state.recommendations.summary);
   scheduleRecommendationCooldownTicker();
@@ -2050,9 +2055,7 @@ function buildRecommendationFilterSummary(filters = getRecommendationFilters()) 
     `${Number(filters.periodMonths || 6)}개월`,
     formatRecommendationLevelLabel(Number(filters.level)),
     formatRecommendationModeLabel(filters.mode),
-    formatRecommendationLookbackLabel(Number(filters.lookbackDays || 1)),
-    formatRecommendationSortLabel(filters.sortBy),
-    formatRecommendationSlotTargetLabel(filters.slotTarget)
+    formatRecommendationLookbackLabel(Number(filters.lookbackDays || 1))
   ].join(" · ");
 }
 
@@ -2582,6 +2585,112 @@ async function loadDashboard(date = getTodayKstDate()) {
     state.saving = false;
     setBusyState(false);
   }
+}
+
+function buildRecommendationFilterSummary(filters = getRecommendationFilters()) {
+  return [
+    formatRecommendationUniverseLabel(filters.universe),
+    `${Number(filters.periodMonths || 6)}개월`,
+    formatRecommendationLevelLabel(Number(filters.level)),
+    formatRecommendationModeLabel(filters.mode),
+    formatRecommendationLookbackLabel(Number(filters.lookbackDays || 1))
+  ].join(" · ");
+}
+
+function getRecommendationAddLabel(slotTarget) {
+  return "담기";
+}
+
+function getRecommendationTargetHint(slotTarget) {
+  return "";
+}
+
+function renderRecommendationResults() {
+  const recommendationState = state.recommendations;
+  setRecommendationSummaryVisibility(recommendationState.summary);
+
+  if (!elements.recommendationList) return;
+
+  const filters = recommendationState.filters || {};
+  const items = Array.isArray(recommendationState.items)
+    ? sortRecommendationItems(recommendationState.items, "distance_abs")
+    : [];
+
+  if (!items.length) {
+    const emptyCopy = recommendationState.loading
+      ? "추천 후보를 계산하고 있습니다."
+      : "조건에 맞는 종목이 없습니다.";
+    elements.recommendationList.innerHTML = `
+      <div class="recommendation-empty">${escapeHtml(emptyCopy)}</div>
+    `;
+    return;
+  }
+
+  const addButtonLabel = getRecommendationAddLabel();
+  const groups = groupRecommendationItemsByMarket(items);
+
+  elements.recommendationList.innerHTML = groups.map((group) => `
+    <section class="recommendation-group" data-market-group="${escapeHtml(group.key)}">
+      <div class="recommendation-group-head">
+        <div>
+          <h3 class="recommendation-group-title">${escapeHtml(group.label)}</h3>
+          <p class="recommendation-group-note">
+            ${escapeHtml(`${group.items.length}종목 · ${formatRecommendationModeLabel(filters.mode)}`)}
+          </p>
+        </div>
+      </div>
+
+      <div class="recommendation-group-body">
+        ${group.items.map((item) => `
+          <article class="recommendation-item">
+            <div class="recommendation-main">
+              <div class="recommendation-topline">
+                <strong class="recommendation-name">${escapeHtml(item.name || item.code || "-")}</strong>
+                <span class="recommendation-badge">${escapeHtml(formatRecommendationMarketLabel(item.market || "-"))}</span>
+                <span class="recommendation-level">${escapeHtml(formatRecommendationLevelLabel(Number(item.level)))}</span>
+              </div>
+
+              <p class="recommendation-subline">${escapeHtml(buildRecommendationSignalMeta(item, filters))}</p>
+
+              <p class="recommendation-signal">
+                <strong>${escapeHtml(item.signalLabel || formatRecommendationModeLabel(filters.mode))}</strong>
+                <span>${escapeHtml(buildRecommendationSignalCopy(item, filters))}</span>
+              </p>
+
+              <div class="recommendation-meta">
+                <div class="recommendation-meta-block recommendation-meta-block-primary">
+                  <span class="recommendation-meta-label">현재가</span>
+                  <span class="recommendation-meta-value">${escapeHtml(formatNumber(Number(item.currentPrice), 0))}</span>
+                </div>
+                <div class="recommendation-meta-block recommendation-meta-block-primary">
+                  <span class="recommendation-meta-label">기준가</span>
+                  <span class="recommendation-meta-value">${escapeHtml(formatNumber(Number(item.levelPrice), 0))}</span>
+                </div>
+                <div class="recommendation-meta-block recommendation-meta-block-primary">
+                  <span class="recommendation-meta-label">괴리율</span>
+                  <span class="recommendation-meta-value ${getToneClass(Number(item.distanceRate))}">${escapeHtml(formatPercent(Number(item.distanceRate)))}</span>
+                </div>
+                <div class="recommendation-meta-block recommendation-meta-block-secondary">
+                  <span class="recommendation-meta-label">기간 고점</span>
+                  <span class="recommendation-meta-value">${escapeHtml(formatNumber(Number(item.periodHigh), 0))}</span>
+                </div>
+                <div class="recommendation-meta-block recommendation-meta-block-secondary">
+                  <span class="recommendation-meta-label">기간 저점</span>
+                  <span class="recommendation-meta-value">${escapeHtml(formatNumber(Number(item.periodLow), 0))}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="recommendation-actions">
+              <button class="recommendation-add" type="button" data-recommendation-code="${escapeHtml(item.code)}">
+                ${escapeHtml(addButtonLabel)}
+              </button>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `).join("");
 }
 
 function restoreState() {
