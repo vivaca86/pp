@@ -95,8 +95,8 @@ var PP_SHEET_GATEWAY = {
   editableTickerCount: 6,
   indexDateRangeA1: 'B3:B80',
   holidayCalendarUrl: 'https://calendar.google.com/calendar/ical/ko.south_korea%23holiday%40group.v.calendar.google.com/public/basic.ics',
-  recalcAttempts: 10,
-  recalcPauseMs: 900
+  recalcAttempts: 14,
+  recalcPauseMs: 1200
 };
 
 function doGet(e) {
@@ -198,7 +198,7 @@ function handleDashboardData_(params) {
     waitForDashboardRefresh_(context, requestedDate, null);
   }
 
-  return buildDashboardPayload_(context);
+  return buildStableDashboardPayload_(context);
 }
 
 function handleUpdateTickers_(params) {
@@ -216,7 +216,7 @@ function handleUpdateTickers_(params) {
   }
 
   waitForDashboardRefresh_(context, requestedDate, resolvedCodes);
-  return buildDashboardPayload_(context);
+  return buildStableDashboardPayload_(context);
 }
 
 function openDashboardContext_() {
@@ -369,6 +369,64 @@ function buildDashboardPayload_(context) {
     rows: rows,
     updatedAt: formatKstTimestamp_(new Date())
   };
+}
+
+function buildStableDashboardPayload_(context) {
+  var payload = buildDashboardPayload_(context);
+
+  for (var attempt = 0; attempt < PP_SHEET_GATEWAY.recalcAttempts; attempt += 1) {
+    if (!isDashboardPayloadSparse_(payload)) {
+      return payload;
+    }
+
+    Utilities.sleep(PP_SHEET_GATEWAY.recalcPauseMs);
+    SpreadsheetApp.flush();
+    payload = buildDashboardPayload_(context);
+  }
+
+  if (isDashboardPayloadSparse_(payload)) {
+    throw createHttpError_(503, '월간표 재계산이 아직 끝나지 않았습니다. 잠시 후 다시 시도해 주세요.', 'PP-DASHBOARD-SPARSE');
+  }
+
+  return payload;
+}
+
+function isDashboardPayloadSparse_(payload) {
+  if (!payload || !Array.isArray(payload.rows) || !payload.rows.length) {
+    return false;
+  }
+
+  var suspiciousRows = 0;
+
+  for (var rowIndex = 0; rowIndex < payload.rows.length; rowIndex += 1) {
+    var row = payload.rows[rowIndex];
+    var values = Array.isArray(row && row.values) ? row.values : [];
+    if (values.length < 8) {
+      continue;
+    }
+
+    var benchmarkFlags = values.slice(0, 2).map(isDashboardCellMeaningful_);
+    var stockFlags = values.slice(2).map(isDashboardCellMeaningful_);
+    var stockValueCount = stockFlags.filter(Boolean).length;
+
+    if ((benchmarkFlags[0] && !benchmarkFlags[1]) || (!benchmarkFlags[0] && benchmarkFlags[1])) {
+      suspiciousRows += 1;
+      continue;
+    }
+
+    if ((benchmarkFlags[0] || benchmarkFlags[1]) && stockValueCount === 0) {
+      suspiciousRows += 1;
+    }
+  }
+
+  return suspiciousRows > 0;
+}
+
+function isDashboardCellMeaningful_(cell) {
+  if (!cell) return false;
+  if (isFiniteNumber_(cell.value)) return true;
+  var display = String(cell.display || '').trim();
+  return display !== '' && display !== '-';
 }
 
 function buildSlotPayloads_(headerRow) {
@@ -2064,20 +2122,39 @@ function isKisInvalidTokenMessage_(message) {
     || text.indexOf('기간이 만료된 토큰') >= 0;
 }
 
-function createHttpError_(status, message) {
+function createHttpError_(status, message, code) {
   var error = new Error(message);
   error.status = status || 500;
+  error.code = code || inferErrorCode_(status, message);
   return error;
 }
 
 function buildErrorResponse_(error) {
+  var status = Number(error && error.status) || 500;
+  var message = String((error && error.message) || error || '알 수 없는 오류가 발생했습니다.');
   return {
     ok: false,
     error: {
-      status: Number(error && error.status) || 500,
-      message: String((error && error.message) || error || '알 수 없는 오류가 발생했습니다.')
+      status: status,
+      code: String((error && error.code) || inferErrorCode_(status, message)),
+      message: message
     }
   };
+}
+
+function inferErrorCode_(status, message) {
+  var text = String(message || '');
+  var normalizedStatus = Number(status || 0);
+
+  if (text.indexOf('토큰') >= 0 || text.indexOf('access token') >= 0) return 'PP-KIS-TOKEN';
+  if (text.indexOf('초당 거래건수') >= 0 || text.indexOf('호출 유량') >= 0) return 'PP-KIS-RATE-LIMIT';
+  if (text.indexOf('월간표') >= 0 || text.indexOf('대시보드') >= 0) return 'PP-DASHBOARD-SPARSE';
+  if (text.indexOf('ticker') >= 0 || text.indexOf('티커') >= 0) return 'PP-TICKER';
+  if (normalizedStatus === 400) return 'PP-BAD-REQUEST';
+  if (normalizedStatus === 401 || normalizedStatus === 403) return 'PP-AUTH';
+  if (normalizedStatus === 404) return 'PP-NOT-FOUND';
+  if (normalizedStatus >= 500) return 'PP-SERVER';
+  return 'PP-UNKNOWN';
 }
 
 function jsonResponse_(payload) {

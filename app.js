@@ -1,11 +1,24 @@
 const MARKET_TIMEZONE = "Asia/Seoul";
 const SLOT_COUNT = 6;
-const GATEWAY_REQUEST_SPACING_MS = 260;
 const STORAGE_LAST_DATE = "stock_lab_selected_date";
-const STORAGE_SLOTS = "stock_lab_slots";
 const STORAGE_ACTIVE_VIEW = "stock_lab_active_view";
 const RECOMMENDATION_GATEWAY_COOLDOWN_MS = 8000;
+const RECOMMENDATION_RUN_COOLDOWN_MS = 12000;
 const RECOMMENDATION_WARMUP_MAX_PERIOD_MONTHS = 12;
+const APP_ERROR_CODES = {
+  gatewayMissing: "PP-GATEWAY-MISSING",
+  gatewayResponseParse: "PP-GATEWAY-PARSE",
+  gatewayRequestFailed: "PP-GATEWAY-REQUEST",
+  recommendationCooldown: "PP-RECO-COOLDOWN",
+  recommendationSlotMissing: "PP-RECO-SLOT",
+  recommendationSlotFull: "PP-RECO-SLOT-FULL",
+  recommendationStockMissing: "PP-RECO-STOCK",
+  tickerLookupFailed: "PP-TICKER-LOOKUP",
+  tickerInputMissing: "PP-TICKER-INPUT",
+  dashboardSyncTimeout: "PP-DASHBOARD-SYNC",
+  monthlyDataSparse: "PP-DASHBOARD-SPARSE",
+  unknown: "PP-UNKNOWN"
+};
 const DEFAULT_GATEWAY_URL = String(
   window.PP_CONFIG?.gatewayUrl
   || window.STOCK_LAB_CONFIG?.gatewayUrl
@@ -15,6 +28,7 @@ const recommendationWarmupState = {
   completedKeys: new Set(),
   pending: new Map()
 };
+let recommendationCooldownTimer = 0;
 
 const KOSPI_BENCHMARK = {
   code: "0001",
@@ -96,7 +110,8 @@ const state = {
       slotTarget: "auto"
     },
     filtersCollapsed: false,
-    loading: false
+    loading: false,
+    cooldownUntil: 0
   }
 };
 
@@ -234,6 +249,49 @@ function normalizeTicker(value) {
   return String(value || "").trim().toUpperCase().replace(/^KRX:/i, "");
 }
 
+function buildAppError(code, message, extras = {}) {
+  const normalizedCode = code || APP_ERROR_CODES.unknown;
+  const normalizedMessage = String(message || "알 수 없는 오류가 발생했습니다.").trim();
+  const error = new Error(
+    normalizedMessage.startsWith(`[${normalizedCode}]`)
+      ? normalizedMessage
+      : `[${normalizedCode}] ${normalizedMessage}`
+  );
+  error.code = normalizedCode;
+  Object.assign(error, extras);
+  return error;
+}
+
+function formatAppErrorMessage(error) {
+  if (!error) return `[${APP_ERROR_CODES.unknown}] 알 수 없는 오류가 발생했습니다.`;
+  const code = String(error.code || error.errorCode || APP_ERROR_CODES.unknown).trim();
+  const message = String(error.message || error || "알 수 없는 오류가 발생했습니다.").trim();
+  if (message.startsWith(`[${code}]`)) {
+    return message;
+  }
+  return `[${code}] ${message}`;
+}
+
+function inferGatewayErrorCode(status, message) {
+  const normalizedMessage = String(message || "").toLowerCase();
+  const normalizedStatus = Number(status || 0);
+
+  if (normalizedMessage.includes("토큰") || normalizedMessage.includes("access token")) {
+    return "PP-KIS-TOKEN";
+  }
+  if (normalizedMessage.includes("호출 유량") || normalizedMessage.includes("초당 거래건수")) {
+    return "PP-KIS-RATE-LIMIT";
+  }
+  if (normalizedMessage.includes("대시보드") || normalizedMessage.includes("월간표")) {
+    return APP_ERROR_CODES.monthlyDataSparse;
+  }
+  if (normalizedStatus === 400) return "PP-BAD-REQUEST";
+  if (normalizedStatus === 401 || normalizedStatus === 403) return "PP-AUTH";
+  if (normalizedStatus === 404) return "PP-NOT-FOUND";
+  if (normalizedStatus >= 500) return "PP-SERVER";
+  return APP_ERROR_CODES.gatewayRequestFailed;
+}
+
 function getToneClass(value) {
   if (!Number.isFinite(value)) return "tone-neutral";
   if (value > 0) return "tone-up";
@@ -319,6 +377,159 @@ function syncRecommendationControls(filters = state.recommendations.filters) {
       elements.recommendationSlotTarget.value = "auto";
     }
   }
+}
+
+function formatRecommendationLevelLabel(value) {
+  const label = formatFibLabel(Number(value));
+  if (label === "-") return "-";
+  return `${label} 되돌림`;
+}
+
+function formatRecommendationSortLabel(value) {
+  switch (String(value || "").trim().toLowerCase()) {
+    case "distance_desc":
+      return "상단 괴리 우선";
+    case "distance_asc":
+      return "하단 괴리 우선";
+    case "name":
+      return "종목명 순";
+    default:
+      return "괴리율 작은 순";
+  }
+}
+
+function setRecommendationSummaryVisibility(summary) {
+  if (!elements.recommendationSummary) return;
+  const text = String(summary || "").trim();
+  elements.recommendationSummary.hidden = !text;
+  elements.recommendationSummary.textContent = text;
+}
+
+function getRecommendationCooldownRemainingMs() {
+  return Math.max(0, Number(state.recommendations.cooldownUntil || 0) - Date.now());
+}
+
+function syncRecommendationRunButtonState() {
+  if (!elements.recommendationRunButton) return;
+  const remainingMs = getRecommendationCooldownRemainingMs();
+  const remainingSeconds = Math.ceil(remainingMs / 1000);
+  const isBusy = Boolean(state.recommendations.loading);
+
+  elements.recommendationRunButton.disabled = isBusy || remainingMs > 0;
+  if (isBusy) {
+    elements.recommendationRunButton.textContent = "추천 찾는 중...";
+    return;
+  }
+  if (remainingMs > 0) {
+    elements.recommendationRunButton.textContent = `재조회 ${remainingSeconds}s`;
+    return;
+  }
+  elements.recommendationRunButton.textContent = "추천 찾기";
+}
+
+function scheduleRecommendationCooldownTicker() {
+  window.clearTimeout(recommendationCooldownTimer);
+  const remainingMs = getRecommendationCooldownRemainingMs();
+  syncRecommendationRunButtonState();
+  if (remainingMs <= 0) return;
+  recommendationCooldownTimer = window.setTimeout(() => {
+    scheduleRecommendationCooldownTicker();
+  }, Math.min(remainingMs, 250));
+}
+
+function startRecommendationCooldown(durationMs = RECOMMENDATION_RUN_COOLDOWN_MS) {
+  const safeDuration = Math.max(0, Number(durationMs || 0));
+  if (!safeDuration) {
+    scheduleRecommendationCooldownTicker();
+    return;
+  }
+  state.recommendations.cooldownUntil = Math.max(
+    Number(state.recommendations.cooldownUntil || 0),
+    Date.now() + safeDuration
+  );
+  scheduleRecommendationCooldownTicker();
+}
+
+async function waitForRecommendationCooldown(filters = state.recommendations.filters) {
+  const remainingMs = getRecommendationCooldownRemainingMs();
+  if (remainingMs <= 0) {
+    scheduleRecommendationCooldownTicker();
+    return;
+  }
+
+  const waitSeconds = Math.ceil(remainingMs / 1000);
+  setRecommendationState({
+    loading: true,
+    filters,
+    summary: `추천 엔진 보호를 위해 ${waitSeconds}초 뒤 다시 조회합니다.`
+  });
+  await waitMs(remainingMs);
+}
+
+function applyStaticUiText() {
+  const recommendationSection = document.getElementById("recommendation-page");
+  const recommendationTitle = recommendationSection?.querySelector("h2");
+  const recommendationNote = recommendationSection?.querySelector(".section-note");
+  const filterTitle = elements.recommendationFilterToggle?.querySelector(".recommendation-filter-toggle-title");
+
+  document.title = "월간 등가율 보드";
+  if (recommendationTitle) recommendationTitle.textContent = "종목추천";
+  if (recommendationNote) {
+    recommendationNote.textContent = "";
+    recommendationNote.hidden = true;
+  }
+  if (elements.dashboardViewButton) elements.dashboardViewButton.textContent = "등가율";
+  if (elements.recommendationViewButton) elements.recommendationViewButton.textContent = "종목추천";
+  elements.mobileViewButtons.forEach((button) => {
+    if (button.dataset.view === "dashboard") button.textContent = "등가율";
+    if (button.dataset.view === "recommendations") button.textContent = "종목추천";
+  });
+  if (filterTitle) filterTitle.textContent = "추천 조건";
+
+  const labelMap = new Map([
+    ["recommendation-universe", "대상"],
+    ["recommendation-period", "기준 기간"],
+    ["recommendation-level", "되돌림 구간"],
+    ["recommendation-mode", "매매 신호"],
+    ["recommendation-lookback", "신호 탐색"],
+    ["recommendation-tolerance", "허용 괴리"],
+    ["recommendation-sort", "우선순위"],
+    ["recommendation-slot-target", "담기 위치"]
+  ]);
+  labelMap.forEach((text, id) => {
+    const label = recommendationSection?.querySelector(`label[for='${id}'] > span`);
+    if (label) label.textContent = text;
+  });
+
+  const updateOptionText = (select, value, text) => {
+    const option = select?.querySelector(`option[value='${value}']`);
+    if (option) option.textContent = text;
+  };
+
+  updateOptionText(elements.recommendationPeriod, "3", "3개월");
+  updateOptionText(elements.recommendationPeriod, "6", "6개월");
+  updateOptionText(elements.recommendationPeriod, "12", "1년");
+  updateOptionText(elements.recommendationLevel, "0.236", "23.6% 되돌림");
+  updateOptionText(elements.recommendationLevel, "0.382", "38.2% 되돌림");
+  updateOptionText(elements.recommendationLevel, "0.5", "50.0% 되돌림");
+  updateOptionText(elements.recommendationMode, "near", "구간 근접");
+  updateOptionText(elements.recommendationMode, "touch", "구간 터치");
+  updateOptionText(elements.recommendationMode, "breakout_up", "상향 돌파");
+  updateOptionText(elements.recommendationMode, "breakdown_down", "하향 이탈");
+  updateOptionText(elements.recommendationLookback, "1", "기준일");
+  updateOptionText(elements.recommendationLookback, "3", "최근 3거래일");
+  updateOptionText(elements.recommendationLookback, "5", "최근 5거래일");
+  updateOptionText(elements.recommendationTolerance, "0.005", "±0.5%");
+  updateOptionText(elements.recommendationTolerance, "0.01", "±1.0%");
+  updateOptionText(elements.recommendationTolerance, "0.015", "±1.5%");
+  updateOptionText(elements.recommendationTolerance, "0.02", "±2.0%");
+  updateOptionText(elements.recommendationSort, "distance_abs", "괴리율 작은 순");
+  updateOptionText(elements.recommendationSort, "distance_desc", "상단 괴리 우선");
+  updateOptionText(elements.recommendationSort, "distance_asc", "하단 괴리 우선");
+  updateOptionText(elements.recommendationSort, "name", "종목명 순");
+
+  setRecommendationSummaryVisibility(state.recommendations.summary);
+  scheduleRecommendationCooldownTicker();
 }
 
 function formatNumber(value, digits = 0) {
@@ -923,19 +1134,11 @@ async function ensureDashboardReadyForRecommendationFlow(date = state.selectedDa
   await loadDashboard(targetDate);
 }
 
-async function mapSequential(items, mapper, spacingMs = 0) {
-  const results = [];
-  for (let index = 0; index < items.length; index += 1) {
-    results.push(await mapper(items[index], index));
-    if (spacingMs && index < items.length - 1) {
-      await waitMs(spacingMs);
-    }
-  }
-  return results;
-}
-
 function setStatus(message, tone = "loading") {
-  elements.statusPill.textContent = message;
+  const statusMessage = tone === "error"
+    ? formatAppErrorMessage(message)
+    : String(message || "");
+  elements.statusPill.textContent = statusMessage;
   elements.statusPill.className = "status-pill";
   if (tone === "success") elements.statusPill.classList.add("is-success");
   if (tone === "error") elements.statusPill.classList.add("is-error");
@@ -1095,10 +1298,6 @@ function createDefaultEditableSlots() {
       editable: true
     };
   });
-}
-
-function persistEditableSlots() {
-  return;
 }
 
 function restoreEditableSlots() {
@@ -1807,6 +2006,556 @@ function bindEvents() {
   });
 }
 
+function formatToleranceLabel(value) {
+  if (!Number.isFinite(value)) return "-";
+  return `±${(value * 100).toFixed(1)}%`;
+}
+
+function formatRecommendationModeLabel(value) {
+  switch (String(value || "").trim().toLowerCase()) {
+    case "touch":
+      return "구간 터치";
+    case "breakout_up":
+      return "상향 돌파";
+    case "breakdown_down":
+      return "하향 이탈";
+    default:
+      return "구간 근접";
+  }
+}
+
+function formatRecommendationLookbackLabel(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 1) return "기준일";
+  return `최근 ${numeric}거래일`;
+}
+
+function formatRecommendationUniverseLabel(value) {
+  const normalized = normalizeRecommendationUniverseClient(value);
+  if (normalized === "KOSPI200") return "KOSPI200";
+  if (normalized === "KOSDAQ150") return "KOSDAQ150";
+  return normalized || "-";
+}
+
+function formatRecommendationSlotTargetLabel(value) {
+  if (String(value || "auto") === "auto") return "자동 담기";
+  const slot = findEditableSlot(value);
+  return slot ? getEditableSlotLabel(slot) : "직접 선택";
+}
+
+function buildRecommendationFilterSummary(filters = getRecommendationFilters()) {
+  return [
+    formatRecommendationUniverseLabel(filters.universe),
+    `${Number(filters.periodMonths || 6)}개월`,
+    formatRecommendationLevelLabel(Number(filters.level)),
+    formatRecommendationModeLabel(filters.mode),
+    formatRecommendationLookbackLabel(Number(filters.lookbackDays || 1)),
+    formatRecommendationSortLabel(filters.sortBy),
+    formatRecommendationSlotTargetLabel(filters.slotTarget)
+  ].join(" · ");
+}
+
+function renderRecommendationFilterPanel() {
+  const filters = getRecommendationFilters();
+  const isCompact = isRecommendationCompactMode();
+  const collapsed = isCompact ? Boolean(state.recommendations.filtersCollapsed) : false;
+
+  if (elements.recommendationFilterSummaryInline) {
+    elements.recommendationFilterSummaryInline.textContent = buildRecommendationFilterSummary(filters);
+  }
+
+  if (elements.recommendationFilterToggle) {
+    elements.recommendationFilterToggle.hidden = !isCompact;
+    elements.recommendationFilterToggle.setAttribute("aria-expanded", String(!collapsed));
+  }
+
+  if (elements.recommendationFilterToggleState) {
+    elements.recommendationFilterToggleState.textContent = collapsed ? "열기" : "접기";
+  }
+
+  if (elements.recommendationFiltersPanel) {
+    elements.recommendationFiltersPanel.hidden = collapsed;
+  }
+
+  syncRecommendationRunButtonState();
+}
+
+function getEditableSlotLabel(slotId) {
+  const slot = typeof slotId === "object" ? slotId : findEditableSlot(slotId);
+  if (!slot) return "종목 슬롯";
+  return `종목${slot.id}`;
+}
+
+function renderRecommendationSlotOptions(selectedValue = state.recommendations.filters.slotTarget) {
+  if (!elements.recommendationSlotTarget) return;
+
+  const options = [
+    '<option value="auto">자동 · 빈 슬롯 우선</option>',
+    ...state.editableSlots.map((slot) => {
+      const label = `${getEditableSlotLabel(slot)} · ${slot.stock?.name || "비어 있음"}`;
+      return `<option value="${slot.id}">${escapeHtml(label)}</option>`;
+    })
+  ];
+
+  elements.recommendationSlotTarget.innerHTML = options.join("");
+  const normalizedValue = String(selectedValue || "auto");
+  elements.recommendationSlotTarget.value = normalizedValue;
+  if (elements.recommendationSlotTarget.value !== normalizedValue) {
+    elements.recommendationSlotTarget.value = "auto";
+  }
+}
+
+function formatRecommendationMarketLabel(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "KOSPI") return "KOSPI";
+  if (normalized === "KOSDAQ") return "KOSDAQ";
+  return normalized || "OTHER";
+}
+
+function buildRecommendationSignalCopy(item, filters = state.recommendations.filters) {
+  const mode = String(item?.signalMode || filters.mode || "near").trim().toLowerCase();
+  const signalDateLabel = formatDisplayDate(item?.signalDate || item?.priceDate);
+  const levelLabel = formatRecommendationLevelLabel(Number(item?.level ?? filters.level));
+
+  if (mode === "touch") {
+    return `${signalDateLabel} ${levelLabel} 구간을 터치했습니다.`;
+  }
+
+  if (mode === "breakout_up") {
+    return `${signalDateLabel} ${levelLabel} 구간을 상향 돌파했습니다.`;
+  }
+
+  if (mode === "breakdown_down") {
+    return `${signalDateLabel} ${levelLabel} 구간을 하향 이탈했습니다.`;
+  }
+
+  return `${signalDateLabel} 현재가가 ${levelLabel} 구간 부근입니다.`;
+}
+
+function buildRecommendationSignalMeta(item, filters = state.recommendations.filters) {
+  return [
+    String(item?.code || "").trim(),
+    formatRecommendationLookbackLabel(Number(item?.signalWindowDays || filters.lookbackDays || 1)),
+    `신호일 ${formatDisplayDate(item?.signalDate || item?.priceDate)}`
+  ].filter(Boolean).join(" · ");
+}
+
+function getRecommendationAddLabel(slotTarget) {
+  if (String(slotTarget || "auto") === "auto") {
+    return "빈 슬롯에 담기";
+  }
+
+  const slot = findEditableSlot(slotTarget);
+  if (!slot) return "종목에 담기";
+  return slot.stock ? `${getEditableSlotLabel(slot)} 교체` : `${getEditableSlotLabel(slot)} 담기`;
+}
+
+function getRecommendationTargetHint(slotTarget) {
+  if (String(slotTarget || "auto") === "auto") {
+    const emptySlot = state.editableSlots.find((slot) => !slot.stock);
+    return emptySlot
+      ? `자동 담기 · ${getEditableSlotLabel(emptySlot)} 비어 있음`
+      : "자동 담기 · 빈 슬롯 없음";
+  }
+
+  const slot = findEditableSlot(slotTarget);
+  if (!slot) return "선택한 슬롯을 찾지 못했습니다.";
+  if (slot.stock) {
+    return `${getEditableSlotLabel(slot)} · ${slot.stock.name} 교체`;
+  }
+  return `${getEditableSlotLabel(slot)}에 바로 담기`;
+}
+
+function setRecommendationBusyState(isBusy) {
+  const busy = Boolean(isBusy);
+  state.recommendations.loading = busy;
+
+  [
+    elements.recommendationUniverse,
+    elements.recommendationPeriod,
+    elements.recommendationLevel,
+    elements.recommendationMode,
+    elements.recommendationLookback,
+    elements.recommendationTolerance,
+    elements.recommendationSort,
+    elements.recommendationSlotTarget
+  ].forEach((element) => {
+    if (element) element.disabled = busy;
+  });
+
+  syncRecommendationRunButtonState();
+}
+
+function buildRecommendationSummary(payload) {
+  if (!payload) return "";
+
+  const parts = [
+    payload.universeLabel || formatRecommendationUniverseLabel(payload.universe),
+    `${payload.scannedCount || 0}종목`,
+    `${payload.matchedCount || 0}종목 포착`,
+    `${payload.periodMonths || 6}개월`,
+    formatRecommendationLevelLabel(Number(payload.level)),
+    formatRecommendationModeLabel(payload.mode),
+    formatToleranceLabel(Number(payload.tolerance))
+  ];
+
+  return parts.filter(Boolean).join(" · ");
+}
+
+function renderRecommendationResults() {
+  const recommendationState = state.recommendations;
+  setRecommendationSummaryVisibility(recommendationState.summary);
+
+  if (!elements.recommendationList) return;
+
+  const filters = recommendationState.filters || {};
+  const items = Array.isArray(recommendationState.items)
+    ? sortRecommendationItems(recommendationState.items, filters.sortBy)
+    : [];
+
+  if (!items.length) {
+    const emptyCopy = recommendationState.loading
+      ? "추천 후보를 계산하고 있습니다."
+      : "조건에 맞는 종목이 없습니다.";
+    elements.recommendationList.innerHTML = `
+      <div class="recommendation-empty">${escapeHtml(emptyCopy)}</div>
+    `;
+    return;
+  }
+
+  const addButtonLabel = getRecommendationAddLabel(filters.slotTarget);
+  const targetHint = getRecommendationTargetHint(filters.slotTarget);
+  const groups = groupRecommendationItemsByMarket(items);
+
+  elements.recommendationList.innerHTML = groups.map((group) => `
+    <section class="recommendation-group" data-market-group="${escapeHtml(group.key)}">
+      <div class="recommendation-group-head">
+        <div>
+          <h3 class="recommendation-group-title">${escapeHtml(group.label)}</h3>
+          <p class="recommendation-group-note">
+            ${escapeHtml(`${group.items.length}종목 · ${formatRecommendationModeLabel(filters.mode)} · ${formatRecommendationSortLabel(filters.sortBy)}`)}
+          </p>
+        </div>
+      </div>
+
+      <div class="recommendation-group-body">
+        ${group.items.map((item) => `
+          <article class="recommendation-item">
+            <div class="recommendation-main">
+              <div class="recommendation-topline">
+                <strong class="recommendation-name">${escapeHtml(item.name || item.code || "-")}</strong>
+                <span class="recommendation-badge">${escapeHtml(formatRecommendationMarketLabel(item.market || "-"))}</span>
+                <span class="recommendation-level">${escapeHtml(formatRecommendationLevelLabel(Number(item.level)))}</span>
+              </div>
+
+              <p class="recommendation-subline">${escapeHtml(buildRecommendationSignalMeta(item, filters))}</p>
+
+              <p class="recommendation-signal">
+                <strong>${escapeHtml(item.signalLabel || formatRecommendationModeLabel(filters.mode))}</strong>
+                <span>${escapeHtml(buildRecommendationSignalCopy(item, filters))}</span>
+              </p>
+
+              <div class="recommendation-meta">
+                <div class="recommendation-meta-block recommendation-meta-block-primary">
+                  <span class="recommendation-meta-label">현재가</span>
+                  <span class="recommendation-meta-value">${escapeHtml(formatNumber(Number(item.currentPrice), 0))}</span>
+                </div>
+                <div class="recommendation-meta-block recommendation-meta-block-primary">
+                  <span class="recommendation-meta-label">기준가</span>
+                  <span class="recommendation-meta-value">${escapeHtml(formatNumber(Number(item.levelPrice), 0))}</span>
+                </div>
+                <div class="recommendation-meta-block recommendation-meta-block-primary">
+                  <span class="recommendation-meta-label">괴리율</span>
+                  <span class="recommendation-meta-value ${getToneClass(Number(item.distanceRate))}">${escapeHtml(formatPercent(Number(item.distanceRate)))}</span>
+                </div>
+                <div class="recommendation-meta-block recommendation-meta-block-secondary">
+                  <span class="recommendation-meta-label">기간 고점</span>
+                  <span class="recommendation-meta-value">${escapeHtml(formatNumber(Number(item.periodHigh), 0))}</span>
+                </div>
+                <div class="recommendation-meta-block recommendation-meta-block-secondary">
+                  <span class="recommendation-meta-label">기간 저점</span>
+                  <span class="recommendation-meta-value">${escapeHtml(formatNumber(Number(item.periodLow), 0))}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="recommendation-actions">
+              <p class="recommendation-target-note">${escapeHtml(targetHint)}</p>
+              <button class="recommendation-add" type="button" data-recommendation-code="${escapeHtml(item.code)}">
+                ${escapeHtml(addButtonLabel)}
+              </button>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `).join("");
+}
+
+function resolveRecommendationTargetSlot(slotTarget = state.recommendations.filters.slotTarget) {
+  const normalizedTarget = String(slotTarget || "auto").trim().toLowerCase();
+  if (normalizedTarget !== "auto") {
+    const slot = findEditableSlot(Number(normalizedTarget));
+    if (!slot) {
+      throw buildAppError(APP_ERROR_CODES.recommendationSlotMissing, "선택한 종목 슬롯을 찾지 못했습니다.");
+    }
+    return slot;
+  }
+
+  const emptySlot = state.editableSlots.find((slot) => !slot.stock);
+  if (!emptySlot) {
+    throw buildAppError(APP_ERROR_CODES.recommendationSlotFull, "빈 종목 슬롯이 없습니다. 기존 종목을 비우거나 직접 슬롯을 선택해 주세요.");
+  }
+  return emptySlot;
+}
+
+async function addRecommendationToSlots(code, slotTarget = getRecommendationFilters().slotTarget) {
+  await ensureDashboardReadyForRecommendationFlow();
+
+  const stock = findCatalogItem(code)
+    || state.recommendations.items.find((item) => normalizeTicker(item.code) === normalizeTicker(code))
+    || null;
+  if (!stock) {
+    throw buildAppError(APP_ERROR_CODES.recommendationStockMissing, `추천 종목을 찾지 못했습니다: ${code}`);
+  }
+
+  const targetSlot = resolveRecommendationTargetSlot(slotTarget);
+  const previousStock = targetSlot.stock ? { ...targetSlot.stock } : null;
+  const nextStock = enrichStockMeta(stock);
+  const nextCodes = state.editableSlots.map((slot) => (
+    slot.id === targetSlot.id
+      ? nextStock.code
+      : normalizeTicker(slot.stock?.code || slot.query || "")
+  ));
+
+  await saveTickerCodes(nextCodes);
+  setActiveView("dashboard");
+
+  if (previousStock && normalizeTicker(previousStock.code) !== normalizeTicker(nextStock.code)) {
+    setStatus(`${getEditableSlotLabel(targetSlot)}이 ${previousStock.name}에서 ${nextStock.name}(으)로 바뀌었습니다.`, "success");
+    return;
+  }
+
+  setStatus(`${nextStock.name}을(를) ${getEditableSlotLabel(targetSlot)}에 담았습니다.`, "success");
+}
+
+async function requestGateway(params, options = {}) {
+  const action = String(params?.action || "").trim();
+  if (!state.gatewayUrl) {
+    throw buildAppError(APP_ERROR_CODES.gatewayMissing, "게이트웨이 URL이 비어 있습니다.", { action });
+  }
+
+  let response;
+  try {
+    response = await fetch(buildRequestUrl(params), {
+      method: "GET",
+      cache: "no-store"
+    });
+  } catch (error) {
+    throw buildAppError(APP_ERROR_CODES.gatewayRequestFailed, "게이트웨이에 연결하지 못했습니다.", {
+      action,
+      cause: error
+    });
+  }
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    throw buildAppError(APP_ERROR_CODES.gatewayResponseParse, "게이트웨이 응답을 읽지 못했습니다.", {
+      action,
+      status: response.status,
+      cause: error
+    });
+  }
+
+  if (!response.ok || !payload?.ok) {
+    const message = String(payload?.message || `게이트웨이 요청이 실패했습니다. (${response.status})`).trim();
+    const code = String(payload?.code || payload?.errorCode || inferGatewayErrorCode(response.status, message)).trim();
+
+    if (!options._retriedSparse
+      && (action === "dashboard-data" || action === "update-tickers")
+      && code === APP_ERROR_CODES.monthlyDataSparse) {
+      await waitMs(1800);
+      return requestGateway(params, {
+        ...options,
+        _retriedSparse: true
+      });
+    }
+
+    throw buildAppError(code, message, {
+      action,
+      status: response.status,
+      payload
+    });
+  }
+
+  return payload;
+}
+
+function getSlotCaption(slot) {
+  if (!slot.editable) return "기준 지수";
+  if (slot.stock) return `${slot.stock.market} · ${slot.stock.code}`;
+  return "코스피/코스닥 종목을 자유롭게 입력할 수 있습니다.";
+}
+
+function getSlotMarketLabel(slot) {
+  if (!slot) return "-";
+  return String(slot.market || slot.stock?.market || "MARKET").trim().toUpperCase();
+}
+
+function renderSlots(slots) {
+  elements.slotGrid.innerHTML = slots.map((slot) => {
+    const isFixed = !slot.editable;
+    const displayName = isFixed ? slot.name : (slot.stock?.name || slot.name || `종목${slot.id}`);
+    const displayValue = isFixed ? slot.name : (slot.query || slot.code || "");
+    const totalValue = Number(slot.total);
+    const totalText = `합계 ${formatPercent(totalValue)}`;
+    const marketLabel = getSlotMarketLabel(slot);
+
+    return `
+      <article class="slot-card${isFixed ? " is-fixed" : ""}" data-slot-card="${slot.id || slot.code}">
+        <div class="slot-heading">
+          <h3 class="slot-name">${escapeHtml(displayName)}</h3>
+          <p class="slot-market slot-market-inline">${escapeHtml(marketLabel)}</p>
+        </div>
+        <input
+          class="slot-input"
+          type="text"
+          value="${escapeHtml(displayValue)}"
+          list="ticker-list"
+          data-editable="${String(Boolean(slot.editable))}"
+          ${slot.editable ? `data-slot-id="${slot.id}"` : "disabled"}
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <div class="slot-footer" title="${escapeHtml(getSlotCaption(slot))}">
+          <p class="slot-total ${getToneClass(totalValue)}">${escapeHtml(totalText)}</p>
+          <p class="slot-market slot-market-footer">${escapeHtml(marketLabel)}</p>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  renderRecommendationSlotOptions(state.recommendations.filters.slotTarget);
+  attachSlotEvents();
+  setBusyState(state.loading || state.saving);
+}
+
+async function loadRecommendations() {
+  if (!state.gatewayUrl) {
+    throw buildAppError(APP_ERROR_CODES.gatewayMissing, "추천 기능을 사용하려면 게이트웨이 연결이 필요합니다.");
+  }
+
+  const filters = getRecommendationFilters();
+  const selectedDate = state.selectedDate || elements.dateInput.value || getTodayKstDate();
+
+  await ensureDashboardReadyForRecommendationFlow(selectedDate);
+  await waitForRecommendationCooldown(filters);
+
+  setRecommendationState({
+    loading: true,
+    filters,
+    summary: `${selectedDate} 기준 추천 후보를 계산하고 있습니다.`
+  });
+
+  try {
+    if (state.loading) {
+      setRecommendationState({
+        loading: true,
+        filters,
+        summary: "월간표를 먼저 동기화하고 있습니다. 잠시만 기다려 주세요."
+      });
+      await waitForLoadingToFinish();
+    }
+
+    const elapsedSinceDashboardLoad = Date.now() - Number(state.lastDashboardLoadedAt || 0);
+    if (state.lastDashboardLoadedAt && elapsedSinceDashboardLoad < RECOMMENDATION_GATEWAY_COOLDOWN_MS) {
+      const waitDuration = RECOMMENDATION_GATEWAY_COOLDOWN_MS - elapsedSinceDashboardLoad;
+      setRecommendationState({
+        loading: true,
+        filters,
+        summary: `대시보드 동기화 직후라 ${Math.ceil(waitDuration / 1000)}초 뒤 추천 조회를 이어갑니다.`
+      });
+      await waitMs(waitDuration);
+    }
+
+    const warmupPromise = warmRecommendationUniverse(filters, { silent: true });
+    if (warmupPromise) {
+      setRecommendationState({
+        loading: true,
+        filters,
+        summary: `${selectedDate} 기준 추천 대상을 미리 준비하고 있습니다.`
+      });
+      await warmupPromise;
+    }
+
+    startRecommendationCooldown(RECOMMENDATION_RUN_COOLDOWN_MS);
+
+    const payload = await requestGateway({
+      action: "fibonacci-recommendations",
+      date: selectedDate,
+      universe: filters.universe,
+      periodMonths: filters.periodMonths,
+      level: filters.level,
+      mode: filters.mode,
+      lookbackDays: filters.lookbackDays,
+      tolerance: filters.tolerance
+    });
+
+    setRecommendationState({
+      loading: false,
+      items: Array.isArray(payload.items) ? payload.items : [],
+      filters,
+      summary: buildRecommendationSummary(payload)
+    });
+    if (isRecommendationCompactMode()) {
+      setRecommendationFiltersCollapsed(true);
+    }
+    setStatus("추천 후보를 불러왔습니다.", "success");
+  } catch (error) {
+    setRecommendationState({
+      loading: false,
+      items: [],
+      filters,
+      summary: formatAppErrorMessage(error)
+    });
+    throw error;
+  }
+}
+
+async function loadDashboard(date = getTodayKstDate()) {
+  const previousDate = state.selectedDate;
+  if (previousDate && previousDate !== date) {
+    setRecommendationState({
+      items: [],
+      loading: false,
+      summary: ""
+    });
+  }
+
+  state.selectedDate = date;
+  localStorage.setItem(STORAGE_LAST_DATE, date);
+  state.loading = true;
+  setBusyState(true);
+  setStatus("월간표를 불러오는 중...", "loading");
+
+  try {
+    const payload = await requestGateway({ action: "dashboard-data", date });
+    renderDashboard(payload);
+    state.lastDashboardLoadedAt = Date.now();
+    warmRecommendationUniverse(state.recommendations.filters, { silent: true }).catch(() => {});
+    setStatus("업데이트 완료", "success");
+  } catch (error) {
+    console.error(error);
+    setStatus(error, "error");
+  } finally {
+    state.loading = false;
+    state.saving = false;
+    setBusyState(false);
+  }
+}
+
 function restoreState() {
   const today = getTodayKstDate();
   state.selectedDate = localStorage.getItem(STORAGE_LAST_DATE) || today;
@@ -1819,11 +2568,13 @@ function restoreState() {
 async function bootstrap() {
   ensureGatewayCard();
   restoreState();
+  applyStaticUiText();
   bindEvents();
   setActiveView(state.activeView, { persist: false });
   setRecommendationState({
     summary: "필터를 고른 뒤 추천 찾기를 누르면 후보 종목이 여기에 표시됩니다."
   });
+  setRecommendationSummaryVisibility("");
   renderSlots(getAllSlots());
 
   try {

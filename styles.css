@@ -379,6 +379,10 @@ input {
   line-height: 1.7;
 }
 
+.recommendation-summary[hidden] {
+  display: none;
+}
+
 .recommendation-list {
   margin-top: 14px;
   display: grid;
@@ -628,6 +632,13 @@ input {
   letter-spacing: -0.04em;
 }
 
+.slot-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .slot-input {
   height: 48px;
   padding: 0 14px;
@@ -653,6 +664,8 @@ input {
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .slot-footer {
@@ -661,6 +674,14 @@ input {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.slot-market-inline {
+  display: none;
+}
+
+.slot-market-footer {
+  display: inline-flex;
 }
 
 .table-head {
@@ -804,6 +825,10 @@ thead th:first-child {
 
   .recommendation-meta {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .recommendation-group-head {
+    align-items: flex-start;
   }
 
   .recommendation-actions {
@@ -1009,8 +1034,7 @@ thead th:first-child {
 }
 
 @media (max-width: 520px) {
-  .recommendation-filters,
-  .recommendation-meta {
+  .recommendation-filters {
     grid-template-columns: 1fr;
   }
 
@@ -1028,19 +1052,28 @@ thead th:first-child {
   }
 
   .recommendation-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 
   .recommendation-meta-block-secondary {
-    display: none;
+    display: grid;
   }
 
   .recommendation-topline {
     align-items: flex-start;
+    gap: 8px;
   }
 
   .recommendation-name {
     font-size: 18px;
+  }
+
+  .recommendation-badge,
+  .recommendation-level {
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 11px;
   }
 }
 
@@ -1085,6 +1118,18 @@ thead th:first-child {
     min-height: auto;
     padding: 15px;
     gap: 9px;
+  }
+
+  .slot-heading {
+    align-items: center;
+  }
+
+  .slot-market-inline {
+    display: inline-flex;
+  }
+
+  .slot-market-footer {
+    display: none;
   }
 
   .slot-grid {
