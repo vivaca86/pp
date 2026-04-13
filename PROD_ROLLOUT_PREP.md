@@ -42,10 +42,16 @@ Production local code is aligned with the tested implementation, and the product
   - `fibonacci-recommendations` for `KOSPI200` now succeeds
   - `fibonacci-warmup` for default `KOSDAQ150` now succeeds with `150 / 150` warmed
   - `fibonacci-recommendations` for default `KOSDAQ150` now succeeds
+  - public-site smoke passed:
+    - recommendation item can be inserted into slot 6
+    - dashboard returns with the inserted `KOSDAQ` stock visible
+    - spreadsheet `D2:I2` reflects the change
+    - restoring the original ticker set also recovers the equal-rate rows
   - scoped token cache has been added so mock/prod tokens do not get mixed
 - Remaining temporary product decision:
   - `ALL` is removed from the production recommendation UI for now
 - Production static front-end has been pushed to `origin/main`.
+- Front-end guard added so recommendation flows wait for dashboard slots to load before saving.
 
 ## Production prerequisites
 
@@ -120,8 +126,8 @@ The production Apps Script project will need KIS credentials before recommendati
 
 ## Decision
 Production backend source is now **deployed**, and the existing dashboard flow is **restored and healthy**.
-Recommendation rollout is now **ready for single-universe production use** with `KOSPI200` and `KOSDAQ150`.
+Recommendation rollout is now **live and smoke-tested** for single-universe production use with `KOSPI200` and `KOSDAQ150`.
 `ALL` remains intentionally disabled in the production UI for stability.
 
 ## Immediate next step
-Wait for GitHub Pages propagation if needed, then run the final public smoke checklist on the live site.
+No immediate blocker remains. Revisit `ALL` later with a batch/cache-based design if needed.
