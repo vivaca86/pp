@@ -1126,6 +1126,10 @@ thead th:first-child {
 
   .slot-market-inline {
     display: inline-flex;
+    min-height: 22px;
+    padding: 0 8px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
   }
 
   .slot-market-footer {

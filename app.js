@@ -2524,6 +2524,33 @@ async function loadRecommendations() {
   }
 }
 
+async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await requestGateway({ action: "dashboard-data", date });
+    } catch (error) {
+      lastError = error;
+      const code = String(error?.code || "").trim();
+      const isRetryable = [
+        APP_ERROR_CODES.monthlyDataSparse,
+        APP_ERROR_CODES.gatewayRequestFailed,
+        "PP-SERVER"
+      ].includes(code);
+
+      if (!isRetryable || attempt >= maxAttempts) {
+        throw error;
+      }
+
+      setStatus(`월간표 동기화 재시도 중... (${attempt}/${maxAttempts})`, "loading");
+      await waitMs(1800 * attempt);
+    }
+  }
+
+  throw lastError || buildAppError(APP_ERROR_CODES.unknown, "월간표를 불러오지 못했습니다.");
+}
+
 async function loadDashboard(date = getTodayKstDate()) {
   const previousDate = state.selectedDate;
   if (previousDate && previousDate !== date) {
@@ -2541,7 +2568,7 @@ async function loadDashboard(date = getTodayKstDate()) {
   setStatus("월간표를 불러오는 중...", "loading");
 
   try {
-    const payload = await requestGateway({ action: "dashboard-data", date });
+    const payload = await loadDashboardPayloadWithRetry(date);
     renderDashboard(payload);
     state.lastDashboardLoadedAt = Date.now();
     warmRecommendationUniverse(state.recommendations.filters, { silent: true }).catch(() => {});
@@ -2576,13 +2603,18 @@ async function bootstrap() {
   });
   setRecommendationSummaryVisibility("");
   renderSlots(getAllSlots());
+  buildTickerDatalist();
 
   try {
-    await loadCatalog();
     await loadDashboard(state.selectedDate);
+    window.setTimeout(() => {
+      loadCatalog().catch((error) => {
+        console.warn("catalog background load", error);
+      });
+    }, 0);
   } catch (error) {
     console.error(error);
-    setStatus(error.message, "error");
+    setStatus(error, "error");
   }
 }
 
