@@ -17,21 +17,33 @@
           <span>기준일</span>
           <input id="date-input" type="date">
         </label>
+        <div class="view-switcher" role="tablist" aria-label="화면 전환">
+          <button
+            id="view-dashboard-button"
+            class="view-switcher-button is-active"
+            type="button"
+            data-view="dashboard"
+            aria-pressed="true"
+          >등가율</button>
+          <button
+            id="view-recommendation-button"
+            class="view-switcher-button"
+            type="button"
+            data-view="recommendations"
+            aria-pressed="false"
+          >종목추천</button>
+        </div>
       </div>
     </section>
 
     <section id="setup-card" class="setup-card panel" hidden>
       <div>
         <strong>Apps Script 게이트웨이 URL이 아직 비어 있습니다.</strong>
-        <p>
-          루트에서 <code>powershell -ExecutionPolicy Bypass -File .\deploy-backend.ps1</code> 를 실행해
-          스크립트 프로젝트를 만든 뒤, Apps Script 편집기에서 <strong>웹앱</strong> 으로 한 번 배포한
-          <code>/exec</code> URL을 <code>config.js</code> 에 넣어주세요.
-        </p>
+        <p>실데이터를 쓰려면 <code>config.js</code>에 배포한 <code>/exec</code> URL을 넣어주세요.</p>
       </div>
     </section>
 
-    <section class="summary-card panel">
+    <section id="dashboard-summary" class="summary-card panel" data-view-page="dashboard">
       <div class="section-head summary-head">
         <div>
           <h2>종목 구성</h2>
@@ -46,7 +58,106 @@
       <div id="slot-grid" class="slot-grid"></div>
     </section>
 
-    <section class="table-card panel">
+    <section id="recommendation-page" class="recommendation-card panel" data-view-page="recommendations" hidden>
+      <div class="section-head recommendation-head">
+        <div>
+          <h2>피보나치 추천</h2>
+          <p class="section-note">KOSPI200, KOSDAQ150 후보에서 선택한 기간의 고점과 저점을 기준으로 근접, 터치, 돌파, 이탈 조건 종목을 찾습니다.</p>
+        </div>
+        <button id="recommendation-run-button" class="primary-button" type="button">추천 찾기</button>
+      </div>
+
+      <div class="recommendation-filter-toolbar">
+        <button id="recommendation-filter-toggle" class="recommendation-filter-toggle" type="button" aria-expanded="true">
+          <span class="recommendation-filter-toggle-top">
+            <span class="recommendation-filter-toggle-title">추천 필터</span>
+            <span id="recommendation-filter-toggle-state" class="recommendation-filter-toggle-state">접기</span>
+          </span>
+          <span id="recommendation-filter-summary-inline" class="recommendation-filter-toggle-summary">전체 · 6개월 · 38.2% · 기준일</span>
+        </button>
+      </div>
+
+      <div id="recommendation-filters-panel" class="recommendation-filters-panel">
+        <div class="recommendation-filters">
+          <label class="recommendation-field" for="recommendation-universe">
+            <span>시장</span>
+            <select id="recommendation-universe">
+              <option value="KOSPI200">KOSPI200</option>
+              <option value="KOSDAQ150" selected>KOSDAQ150</option>
+            </select>
+          </label>
+
+          <label class="recommendation-field" for="recommendation-period">
+            <span>기간</span>
+            <select id="recommendation-period">
+              <option value="3">3개월</option>
+              <option value="6" selected>6개월</option>
+              <option value="12">1년</option>
+            </select>
+          </label>
+
+          <label class="recommendation-field" for="recommendation-level">
+            <span>레벨</span>
+            <select id="recommendation-level">
+              <option value="0.236">23.6%</option>
+              <option value="0.382" selected>38.2%</option>
+              <option value="0.5">50.0%</option>
+            </select>
+          </label>
+
+          <label class="recommendation-field" for="recommendation-mode">
+            <span>조건</span>
+            <select id="recommendation-mode">
+              <option value="near" selected>레벨 근접</option>
+              <option value="touch">레벨 터치</option>
+              <option value="breakout_up">상향 돌파</option>
+              <option value="breakdown_down">하향 이탈</option>
+            </select>
+          </label>
+
+          <label class="recommendation-field" for="recommendation-lookback">
+            <span>탐지 범위</span>
+            <select id="recommendation-lookback">
+              <option value="1" selected>기준일</option>
+              <option value="3">최근 3거래일</option>
+              <option value="5">최근 5거래일</option>
+            </select>
+          </label>
+
+          <label class="recommendation-field" for="recommendation-tolerance">
+            <span>허용 오차</span>
+            <select id="recommendation-tolerance">
+              <option value="0.005">±0.5%</option>
+              <option value="0.01" selected>±1.0%</option>
+              <option value="0.015">±1.5%</option>
+              <option value="0.02">±2.0%</option>
+            </select>
+          </label>
+
+          <label class="recommendation-field" for="recommendation-sort">
+            <span>정렬</span>
+            <select id="recommendation-sort">
+              <option value="distance_abs" selected>레벨 근접순</option>
+              <option value="distance_desc">레벨 위쪽순</option>
+              <option value="distance_asc">레벨 아래쪽순</option>
+              <option value="name">종목명순</option>
+            </select>
+          </label>
+
+          <label class="recommendation-field" for="recommendation-slot-target">
+            <span>담기 위치</span>
+            <select id="recommendation-slot-target">
+              <option value="auto" selected>자동 · 빈 슬롯 우선</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div id="recommendation-summary" class="recommendation-summary">필터를 고른 뒤 추천 찾기를 누르면 후보 종목이 여기에 표시됩니다.</div>
+      <div id="recommendation-list" class="recommendation-list"></div>
+    </section>
+
+    <section id="dashboard-table" class="table-card panel" data-view-page="dashboard">
       <div class="section-head table-head">
         <div>
           <h2>월간 표</h2>
@@ -77,6 +188,21 @@
       </div>
     </section>
   </main>
+
+  <nav class="mobile-bottom-nav" aria-label="모바일 메뉴">
+    <button
+      class="mobile-bottom-nav-button is-active"
+      type="button"
+      data-view="dashboard"
+      aria-pressed="true"
+    >등가율</button>
+    <button
+      class="mobile-bottom-nav-button"
+      type="button"
+      data-view="recommendations"
+      aria-pressed="false"
+    >종목추천</button>
+  </nav>
 
   <datalist id="ticker-list"></datalist>
 
