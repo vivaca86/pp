@@ -141,8 +141,6 @@ const elements = {
   recommendationMode: document.getElementById("recommendation-mode"),
   recommendationLookback: document.getElementById("recommendation-lookback"),
   recommendationTolerance: document.getElementById("recommendation-tolerance"),
-  recommendationSort: document.getElementById("recommendation-sort"),
-  recommendationSlotTarget: document.getElementById("recommendation-slot-target"),
   recommendationSummary: document.getElementById("recommendation-summary"),
   recommendationList: document.getElementById("recommendation-list"),
   dashboardViewButton: document.getElementById("view-dashboard-button"),
@@ -369,14 +367,6 @@ function syncRecommendationControls(filters = state.recommendations.filters) {
   if (elements.recommendationMode) elements.recommendationMode.value = String(filters.mode || "near");
   if (elements.recommendationLookback) elements.recommendationLookback.value = String(filters.lookbackDays || 1);
   if (elements.recommendationTolerance) elements.recommendationTolerance.value = String(filters.tolerance);
-  if (elements.recommendationSort) elements.recommendationSort.value = String(filters.sortBy || "distance_abs");
-  renderRecommendationSlotOptions(filters.slotTarget);
-  if (elements.recommendationSlotTarget) {
-    elements.recommendationSlotTarget.value = String(filters.slotTarget || "auto");
-    if (elements.recommendationSlotTarget.value !== String(filters.slotTarget || "auto")) {
-      elements.recommendationSlotTarget.value = "auto";
-    }
-  }
 }
 
 function formatRecommendationLevelLabel(value) {
@@ -492,9 +482,7 @@ function applyStaticUiText() {
     ["recommendation-level", "되돌림 구간"],
     ["recommendation-mode", "매매 신호"],
     ["recommendation-lookback", "신호 탐색"],
-    ["recommendation-tolerance", "허용 괴리"],
-    ["recommendation-sort", "우선순위"],
-    ["recommendation-slot-target", "담기 위치"]
+    ["recommendation-tolerance", "허용 괴리"]
   ]);
   labelMap.forEach((text, id) => {
     const label = recommendationSection?.querySelector(`label[for='${id}'] > span`);
@@ -523,15 +511,6 @@ function applyStaticUiText() {
   updateOptionText(elements.recommendationTolerance, "0.01", "±1.0%");
   updateOptionText(elements.recommendationTolerance, "0.015", "±1.5%");
   updateOptionText(elements.recommendationTolerance, "0.02", "±2.0%");
-  updateOptionText(elements.recommendationSort, "distance_abs", "괴리율 작은 순");
-  updateOptionText(elements.recommendationSort, "distance_desc", "상단 괴리 우선");
-  updateOptionText(elements.recommendationSort, "distance_asc", "하단 괴리 우선");
-  updateOptionText(elements.recommendationSort, "name", "종목명 순");
-
-  const sortField = recommendationSection?.querySelector("label[for='recommendation-sort']");
-  const slotTargetField = recommendationSection?.querySelector("label[for='recommendation-slot-target']");
-  if (sortField) sortField.hidden = true;
-  if (slotTargetField) slotTargetField.hidden = true;
 
   setRecommendationSummaryVisibility(state.recommendations.summary);
   scheduleRecommendationCooldownTicker();
@@ -847,9 +826,7 @@ function setRecommendationBusyState(isBusy) {
     elements.recommendationLevel,
     elements.recommendationMode,
     elements.recommendationLookback,
-    elements.recommendationTolerance,
-    elements.recommendationSort,
-    elements.recommendationSlotTarget
+    elements.recommendationTolerance
   ].forEach((element) => {
     if (element) element.disabled = Boolean(isBusy);
   });
@@ -2180,9 +2157,7 @@ function setRecommendationBusyState(isBusy) {
     elements.recommendationLevel,
     elements.recommendationMode,
     elements.recommendationLookback,
-    elements.recommendationTolerance,
-    elements.recommendationSort,
-    elements.recommendationSlotTarget
+    elements.recommendationTolerance
   ].forEach((element) => {
     if (element) element.disabled = busy;
   });
