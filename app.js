@@ -784,6 +784,8 @@ function resolveRecommendationTargetSlot(slotTarget = state.recommendations.filt
 }
 
 async function addRecommendationToSlots(code, slotTarget = getRecommendationFilters().slotTarget) {
+  await ensureDashboardReadyForRecommendationFlow();
+
   const stock = findCatalogItem(code)
     || state.recommendations.items.find((item) => normalizeTicker(item.code) === normalizeTicker(code))
     || null;
@@ -818,6 +820,8 @@ async function loadRecommendations() {
 
   const filters = getRecommendationFilters();
   const selectedDate = state.selectedDate || elements.dateInput.value || getTodayKstDate();
+
+  await ensureDashboardReadyForRecommendationFlow(selectedDate);
 
   setRecommendationState({
     loading: true,
@@ -901,6 +905,22 @@ async function waitForLoadingToFinish(maxWaitMs = 15000) {
   while (state.loading && (Date.now() - startedAt) < maxWaitMs) {
     await waitMs(250);
   }
+}
+
+async function ensureDashboardReadyForRecommendationFlow(date = state.selectedDate || elements.dateInput.value || getTodayKstDate()) {
+  const targetDate = date || getTodayKstDate();
+
+  if (state.loading) {
+    await waitForLoadingToFinish();
+  }
+
+  const hasEditableSlots = state.editableSlots.length === SLOT_COUNT;
+  const sameDateLoaded = state.dashboard?.selectedDate === targetDate;
+  if (state.dashboard && hasEditableSlots && sameDateLoaded) {
+    return;
+  }
+
+  await loadDashboard(targetDate);
 }
 
 async function mapSequential(items, mapper, spacingMs = 0) {
