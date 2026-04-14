@@ -1442,13 +1442,14 @@ function attachSlotEvents() {
 
 async function saveTickerCodes(codes, maxAttempts = 3) {
   let lastError = null;
+  const targetDate = elements.dateInput.value || state.selectedDate || getTodayKstDate();
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const payload = await requestGateway({
         action: "update-tickers",
         tickers: codes.join(","),
-        date: elements.dateInput.value || state.selectedDate || getTodayKstDate()
+        date: targetDate
       });
 
       renderDashboard(payload);
@@ -1468,6 +1469,25 @@ async function saveTickerCodes(codes, maxAttempts = 3) {
 
       setStatus(`종목 저장 재시도 중... (${attempt}/${maxAttempts})`, "loading");
       await waitMs(1200 * attempt);
+    }
+  }
+
+  const lastCode = String(lastError?.code || "").trim();
+  if ([APP_ERROR_CODES.monthlyDataSparse, APP_ERROR_CODES.gatewayRequestFailed, "PP-SERVER"].includes(lastCode)) {
+    setStatus("종목 저장은 반영되었는지 확인 중입니다...", "loading");
+
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      try {
+        const payload = await requestGateway({ action: "dashboard-data", date: targetDate });
+        renderDashboard(payload);
+        return payload;
+      } catch (error) {
+        const code = String(error?.code || "").trim();
+        if (code !== APP_ERROR_CODES.monthlyDataSparse || attempt >= 10) {
+          throw error;
+        }
+        await waitMs(1500);
+      }
     }
   }
 
