@@ -2,6 +2,7 @@ const MARKET_TIMEZONE = "Asia/Seoul";
 const SLOT_COUNT = 6;
 const STORAGE_LAST_DATE = "stock_lab_selected_date";
 const STORAGE_ACTIVE_VIEW = "stock_lab_active_view";
+const STORAGE_DASHBOARD_SOURCE_MODE = "stock_lab_dashboard_source_mode";
 const RECOMMENDATION_GATEWAY_COOLDOWN_MS = 8000;
 const RECOMMENDATION_RUN_COOLDOWN_MS = 12000;
 const RECOMMENDATION_WARMUP_MAX_PERIOD_MONTHS = 12;
@@ -24,6 +25,7 @@ const DEFAULT_GATEWAY_URL = String(
   || window.STOCK_LAB_CONFIG?.gatewayUrl
   || ""
 ).trim();
+const DEFAULT_DASHBOARD_SOURCE_MODE = "api";
 const recommendationWarmupState = {
   completedKeys: new Set(),
   pending: new Map()
@@ -2559,7 +2561,29 @@ async function loadRecommendations() {
   }
 }
 
-async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
+function getDashboardSourceMode() {
+  const configured = String(window.PP_CONFIG?.dashboardSourceMode || DEFAULT_DASHBOARD_SOURCE_MODE).trim().toLowerCase();
+  const persisted = String(localStorage.getItem(STORAGE_DASHBOARD_SOURCE_MODE) || configured).trim().toLowerCase();
+  return persisted === "sheet" ? "sheet" : "api";
+}
+
+async function loadDashboardPayloadFromApi(date) {
+  if (!window.DashboardApiSource?.loadPayload) {
+    throw buildAppError(APP_ERROR_CODES.gatewayMissing, "API 데이터 소스 모듈을 찾지 못했습니다.");
+  }
+
+  return window.DashboardApiSource.loadPayload({
+    date,
+    getAllSlots,
+    loadMonthlySeriesForTarget,
+    loadSnapshotForTarget,
+    applySnapshotToSeries,
+    buildDashboardPayload,
+    resolveMarketSession
+  });
+}
+
+async function loadDashboardPayloadFromSheetWithRetry(date, maxAttempts = 3) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -2584,6 +2608,21 @@ async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
   }
 
   throw lastError || buildAppError(APP_ERROR_CODES.unknown, "월간표를 불러오지 못했습니다.");
+}
+
+async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
+  const sourceMode = getDashboardSourceMode();
+  if (sourceMode === "sheet") {
+    return loadDashboardPayloadFromSheetWithRetry(date, maxAttempts);
+  }
+
+  try {
+    return await loadDashboardPayloadFromApi(date);
+  } catch (error) {
+    console.warn("api dashboard source failed, fallback to sheet", error);
+    setStatus("API 조회에 실패해 스프레드시트 방식으로 전환합니다...", "loading");
+    return loadDashboardPayloadFromSheetWithRetry(date, maxAttempts);
+  }
 }
 
 async function loadDashboard(date = getTodayKstDate()) {
