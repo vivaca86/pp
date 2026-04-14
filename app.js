@@ -2349,8 +2349,21 @@ async function requestGateway(params, options = {}) {
   }
 
   if (!response.ok || !payload?.ok) {
-    const message = String(payload?.message || `게이트웨이 요청이 실패했습니다. (${response.status})`).trim();
-    const code = String(payload?.code || payload?.errorCode || inferGatewayErrorCode(response.status, message)).trim();
+    const gatewayError = payload?.error && typeof payload.error === "object"
+      ? payload.error
+      : null;
+    const message = String(
+      payload?.message
+      || gatewayError?.message
+      || `게이트웨이 요청이 실패했습니다. (${response.status})`
+    ).trim();
+    const status = Number(gatewayError?.status || payload?.status || response.status);
+    const code = String(
+      payload?.code
+      || payload?.errorCode
+      || gatewayError?.code
+      || inferGatewayErrorCode(status, message)
+    ).trim();
 
     if (!options._retriedSparse
       && (action === "dashboard-data" || action === "update-tickers")
@@ -2364,7 +2377,7 @@ async function requestGateway(params, options = {}) {
 
     throw buildAppError(code, message, {
       action,
-      status: response.status,
+      status,
       payload
     });
   }
