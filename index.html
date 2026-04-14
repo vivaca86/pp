@@ -190,13 +190,13 @@
 
   <datalist id="ticker-list"></datalist>
 
-  <script src="./config.js?v=20260414c"></script>
+  <script src="./config.js?v=20260414d"></script>
   <script>
     window.PP_CONFIG = window.PP_CONFIG || {};
     window.PP_CONFIG.dashboardSourceMode = "sheet";
   </script>
-  <script src="./dashboard-api-source.js?v=20260414c"></script>
-  <script src="./app.js?v=20260414c"></script>
+  <script src="./dashboard-api-source.js?v=20260414d"></script>
+  <script src="./app.js?v=20260414d"></script>
   <script>
     (function () {
       const unlockEditableInputs = () => {
@@ -211,8 +211,108 @@
         window.setTimeout(unlockEditableInputs, 1200);
       };
 
+      const cloneEditableSlots = () => state.editableSlots.map((slot) => ({
+        id: slot.id,
+        query: slot.query,
+        stock: slot.stock ? { ...slot.stock } : null,
+        editable: true
+      }));
+
+      const buildEditableSlotsFromCodes = (codes) => codes.map((code, index) => {
+        const normalized = normalizeTicker(code);
+        return {
+          id: index + 1,
+          query: normalized,
+          stock: normalized ? enrichStockMeta({ code: normalized }) : null,
+          editable: true
+        };
+      });
+
+      const areTickersApplied = (payload, codes) => {
+        const expected = codes.map((code) => normalizeTicker(code));
+        const applied = Array.isArray(payload?.slots)
+          ? payload.slots
+            .filter((slot) => slot?.editable)
+            .map((slot) => normalizeTicker(slot.code || ""))
+          : [];
+
+        if (applied.length !== expected.length) return false;
+        return applied.every((code, index) => code === expected[index]);
+      };
+
+      const installRuntimePatches = () => {
+        if (typeof setBusyState === "function") {
+          setBusyState = function (isBusy) {
+            const shouldDisableDate = Boolean(isBusy || state.loading || state.saving);
+            elements.dateInput.disabled = shouldDisableDate;
+            document.querySelectorAll('.slot-input[data-editable="true"]').forEach((input) => {
+              input.disabled = Boolean(state.saving);
+            });
+          };
+        }
+
+        if (typeof loadDashboardPayloadWithRetry === "function") {
+          loadDashboardPayloadWithRetry = async function (date, maxAttempts = 3) {
+            if (!state.dashboard) {
+              return loadDashboardPayloadFromSheetWithRetry(date, Math.min(maxAttempts, 2));
+            }
+
+            try {
+              return await loadDashboardPayloadFromApi(date);
+            } catch (error) {
+              console.warn("api dashboard source failed, fallback to sheet", error);
+              setStatus("빠른 조회에 실패해 스프레드시트 값으로 다시 불러오는 중입니다...", "loading");
+              return loadDashboardPayloadFromSheetWithRetry(date, Math.min(maxAttempts, 2));
+            }
+          };
+        }
+
+        if (typeof saveTickerCodes === "function") {
+          saveTickerCodes = async function (codes) {
+            const targetDate = elements.dateInput.value || state.selectedDate || getTodayKstDate();
+            const previousEditableSlots = cloneEditableSlots();
+            const nextEditableSlots = buildEditableSlotsFromCodes(codes);
+
+            state.editableSlots = nextEditableSlots;
+
+            try {
+              await requestGateway({
+                action: "update-tickers",
+                tickers: codes.join(","),
+                date: targetDate
+              });
+
+              try {
+                const payload = await loadDashboardPayloadFromApi(targetDate);
+                renderDashboard(payload);
+                state.lastDashboardLoadedAt = Date.now();
+                setStatus("지정한 종목으로 등가율 데이터를 갱신했습니다.", "success");
+                scheduleUnlock();
+                return { ok: true, payload };
+              } catch (apiError) {
+                console.warn("api refresh after save failed, fallback to sheet", apiError);
+                const payload = await loadDashboardPayloadFromSheetWithRetry(targetDate, 2);
+                if (!areTickersApplied(payload, codes)) {
+                  throw apiError;
+                }
+                renderDashboard(payload);
+                state.lastDashboardLoadedAt = Date.now();
+                setStatus("지정한 종목으로 등가율 데이터를 갱신했습니다.", "success");
+                scheduleUnlock();
+                return { ok: true, payload };
+              }
+            } catch (error) {
+              state.editableSlots = previousEditableSlots;
+              throw error;
+            }
+          };
+        }
+
+        scheduleUnlock();
+      };
+
       const watchSlotGrid = () => {
-        const slotGrid = document.getElementById('slot-grid');
+        const slotGrid = document.getElementById("slot-grid");
         if (!slotGrid) {
           window.setTimeout(watchSlotGrid, 300);
           return;
@@ -225,8 +325,19 @@
         scheduleUnlock();
       };
 
-      window.addEventListener('load', scheduleUnlock);
-      watchSlotGrid();
+      const boot = () => {
+        installRuntimePatches();
+        watchSlotGrid();
+        scheduleUnlock();
+      };
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot, { once: true });
+      } else {
+        boot();
+      }
+
+      window.addEventListener("load", scheduleUnlock);
     })();
   </script>
 </body>
