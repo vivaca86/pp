@@ -1442,21 +1442,48 @@ function attachSlotEvents() {
 
 async function saveTickerCodes(codes) {
   const targetDate = elements.dateInput.value || state.selectedDate || getTodayKstDate();
+  const requestedCodes = codes.map((code) => normalizeTicker(code));
   await requestGateway({
     action: "update-tickers",
     tickers: codes.join(","),
     date: targetDate
   });
 
-  loadDashboardPayloadWithRetry(targetDate)
-    .then((payload) => {
-      renderDashboard(payload);
-      setStatus("저장된 종목으로 월간표를 갱신했습니다.", "success");
-    })
-    .catch((error) => {
-      console.warn("dashboard refresh after save", error);
-      setStatus("종목 저장 완료 · 월간표 갱신 대기 중", "loading");
-    });
+  const areTickersApplied = (payload) => {
+    const applied = Array.isArray(payload?.slots)
+      ? payload.slots
+        .filter((slot) => slot?.editable)
+        .map((slot) => normalizeTicker(slot.code || ""))
+      : [];
+    if (applied.length !== requestedCodes.length) return false;
+    return applied.every((code, index) => code === requestedCodes[index]);
+  };
+
+  (async () => {
+    const maxAttempts = 12;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const payload = await requestGateway({ action: "dashboard-data", date: targetDate });
+        if (!areTickersApplied(payload)) {
+          if (attempt < maxAttempts) await waitMs(1500);
+          continue;
+        }
+        renderDashboard(payload);
+        setStatus("지정된 종목으로 월간표를 갱신했습니다.", "success");
+        return;
+      } catch (error) {
+        const code = String(error?.code || "").trim();
+        if (code === APP_ERROR_CODES.monthlyDataSparse && attempt < maxAttempts) {
+          await waitMs(1500);
+          continue;
+        }
+        console.warn("dashboard refresh after save", error);
+        break;
+      }
+    }
+
+    setStatus("종목 저장 완료 · 월간표 반영 대기 중", "loading");
+  })();
 
   return { ok: true, pendingRecalc: true };
 }
