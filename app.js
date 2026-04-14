@@ -141,8 +141,6 @@ const elements = {
   recommendationMode: document.getElementById("recommendation-mode"),
   recommendationLookback: document.getElementById("recommendation-lookback"),
   recommendationTolerance: document.getElementById("recommendation-tolerance"),
-  recommendationSort: document.getElementById("recommendation-sort"),
-  recommendationSlotTarget: document.getElementById("recommendation-slot-target"),
   recommendationSummary: document.getElementById("recommendation-summary"),
   recommendationList: document.getElementById("recommendation-list"),
   dashboardViewButton: document.getElementById("view-dashboard-button"),
@@ -369,14 +367,6 @@ function syncRecommendationControls(filters = state.recommendations.filters) {
   if (elements.recommendationMode) elements.recommendationMode.value = String(filters.mode || "near");
   if (elements.recommendationLookback) elements.recommendationLookback.value = String(filters.lookbackDays || 1);
   if (elements.recommendationTolerance) elements.recommendationTolerance.value = String(filters.tolerance);
-  if (elements.recommendationSort) elements.recommendationSort.value = String(filters.sortBy || "distance_abs");
-  renderRecommendationSlotOptions(filters.slotTarget);
-  if (elements.recommendationSlotTarget) {
-    elements.recommendationSlotTarget.value = String(filters.slotTarget || "auto");
-    if (elements.recommendationSlotTarget.value !== String(filters.slotTarget || "auto")) {
-      elements.recommendationSlotTarget.value = "auto";
-    }
-  }
 }
 
 function formatRecommendationLevelLabel(value) {
@@ -492,9 +482,7 @@ function applyStaticUiText() {
     ["recommendation-level", "되돌림 구간"],
     ["recommendation-mode", "매매 신호"],
     ["recommendation-lookback", "신호 탐색"],
-    ["recommendation-tolerance", "허용 괴리"],
-    ["recommendation-sort", "우선순위"],
-    ["recommendation-slot-target", "담기 위치"]
+    ["recommendation-tolerance", "허용 괴리"]
   ]);
   labelMap.forEach((text, id) => {
     const label = recommendationSection?.querySelector(`label[for='${id}'] > span`);
@@ -523,15 +511,6 @@ function applyStaticUiText() {
   updateOptionText(elements.recommendationTolerance, "0.01", "±1.0%");
   updateOptionText(elements.recommendationTolerance, "0.015", "±1.5%");
   updateOptionText(elements.recommendationTolerance, "0.02", "±2.0%");
-  updateOptionText(elements.recommendationSort, "distance_abs", "괴리율 작은 순");
-  updateOptionText(elements.recommendationSort, "distance_desc", "상단 괴리 우선");
-  updateOptionText(elements.recommendationSort, "distance_asc", "하단 괴리 우선");
-  updateOptionText(elements.recommendationSort, "name", "종목명 순");
-
-  const sortField = recommendationSection?.querySelector("label[for='recommendation-sort']");
-  const slotTargetField = recommendationSection?.querySelector("label[for='recommendation-slot-target']");
-  if (sortField) sortField.hidden = true;
-  if (slotTargetField) slotTargetField.hidden = true;
 
   setRecommendationSummaryVisibility(state.recommendations.summary);
   scheduleRecommendationCooldownTicker();
@@ -847,9 +826,7 @@ function setRecommendationBusyState(isBusy) {
     elements.recommendationLevel,
     elements.recommendationMode,
     elements.recommendationLookback,
-    elements.recommendationTolerance,
-    elements.recommendationSort,
-    elements.recommendationSlotTarget
+    elements.recommendationTolerance
   ].forEach((element) => {
     if (element) element.disabled = Boolean(isBusy);
   });
@@ -1280,6 +1257,9 @@ async function resolveStockInput(rawValue) {
 function resolveTickerCode(rawValue) {
   const raw = String(rawValue || "").trim();
   if (!raw) return "";
+  if (raw.includes(",")) {
+    throw new Error(`종목명에 쉼표(,)는 사용할 수 없습니다: ${raw}`);
+  }
 
   const exact = findCatalogItem(raw);
   if (exact) return normalizeTicker(exact.code);
@@ -1289,7 +1269,37 @@ function resolveTickerCode(rawValue) {
     return ticker;
   }
 
-  throw new Error(`종목을 찾지 못했습니다: ${raw}`);
+  const needle = normalizeSearchText(raw);
+  const fuzzy = state.catalog.find((item) => {
+    const codeKey = normalizeSearchText(item.code);
+    const nameKey = normalizeSearchText(item.name);
+    return codeKey.includes(needle) || nameKey.includes(needle);
+  });
+  if (fuzzy) return normalizeTicker(fuzzy.code);
+
+  return raw;
+}
+
+async function resolveTickerCodeForSave(rawValue) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return "";
+
+  const localResolved = resolveTickerCode(raw);
+  if (normalizeTicker(localResolved) !== normalizeTicker(raw) || /^[A-Z0-9]{6,9}$/.test(normalizeTicker(localResolved))) {
+    return localResolved;
+  }
+
+  if (!state.gatewayUrl) return localResolved;
+
+  try {
+    const payload = await requestGateway({ action: "stock-search", q: raw });
+    const first = Array.isArray(payload?.items) ? payload.items[0] : null;
+    if (first?.code) return normalizeTicker(first.code);
+  } catch (error) {
+    console.warn("stock-search fallback", error);
+  }
+
+  return localResolved;
 }
 
 function createDefaultEditableSlots() {
@@ -1428,15 +1438,58 @@ function attachSlotEvents() {
   });
 }
 
-async function saveTickerCodes(codes) {
-  const payload = await requestGateway({
-    action: "update-tickers",
-    tickers: codes.join(","),
-    date: elements.dateInput.value || state.selectedDate || getTodayKstDate()
-  });
+async function saveTickerCodes(codes, maxAttempts = 3) {
+  let lastError = null;
+  const targetDate = elements.dateInput.value || state.selectedDate || getTodayKstDate();
 
-  renderDashboard(payload);
-  return payload;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const payload = await requestGateway({
+        action: "update-tickers",
+        tickers: codes.join(","),
+        date: targetDate
+      });
+
+      renderDashboard(payload);
+      return payload;
+    } catch (error) {
+      lastError = error;
+      const code = String(error?.code || "").trim();
+      const retryable = [
+        APP_ERROR_CODES.monthlyDataSparse,
+        APP_ERROR_CODES.gatewayRequestFailed,
+        "PP-SERVER"
+      ].includes(code);
+
+      if (!retryable || attempt >= maxAttempts) {
+        throw error;
+      }
+
+      setStatus(`종목 저장 재시도 중... (${attempt}/${maxAttempts})`, "loading");
+      await waitMs(1200 * attempt);
+    }
+  }
+
+  const lastCode = String(lastError?.code || "").trim();
+  if ([APP_ERROR_CODES.monthlyDataSparse, APP_ERROR_CODES.gatewayRequestFailed, "PP-SERVER"].includes(lastCode)) {
+    setStatus("종목 저장은 반영되었는지 확인 중입니다...", "loading");
+
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      try {
+        const payload = await requestGateway({ action: "dashboard-data", date: targetDate });
+        renderDashboard(payload);
+        return payload;
+      } catch (error) {
+        const code = String(error?.code || "").trim();
+        if (code !== APP_ERROR_CODES.monthlyDataSparse || attempt >= 10) {
+          throw error;
+        }
+        await waitMs(1500);
+      }
+    }
+  }
+
+  throw lastError || buildAppError(APP_ERROR_CODES.unknown, "종목 저장에 실패했습니다.");
 }
 
 async function saveTickers() {
@@ -1452,7 +1505,7 @@ async function saveTickers() {
       throw new Error("편집 가능한 종목 입력칸을 모두 찾지 못했습니다.");
     }
 
-    const tickers = inputs.map((input) => resolveTickerCode(input.value));
+    const tickers = await Promise.all(inputs.map((input) => resolveTickerCodeForSave(input.value)));
     await saveTickerCodes(tickers);
     setStatus("종목 저장 완료", "success");
   } finally {
@@ -2180,9 +2233,7 @@ function setRecommendationBusyState(isBusy) {
     elements.recommendationLevel,
     elements.recommendationMode,
     elements.recommendationLookback,
-    elements.recommendationTolerance,
-    elements.recommendationSort,
-    elements.recommendationSlotTarget
+    elements.recommendationTolerance
   ].forEach((element) => {
     if (element) element.disabled = busy;
   });
@@ -2374,8 +2425,21 @@ async function requestGateway(params, options = {}) {
   }
 
   if (!response.ok || !payload?.ok) {
-    const message = String(payload?.message || `게이트웨이 요청이 실패했습니다. (${response.status})`).trim();
-    const code = String(payload?.code || payload?.errorCode || inferGatewayErrorCode(response.status, message)).trim();
+    const gatewayError = payload?.error && typeof payload.error === "object"
+      ? payload.error
+      : null;
+    const message = String(
+      payload?.message
+      || gatewayError?.message
+      || `게이트웨이 요청이 실패했습니다. (${response.status})`
+    ).trim();
+    const status = Number(gatewayError?.status || payload?.status || response.status);
+    const code = String(
+      payload?.code
+      || payload?.errorCode
+      || gatewayError?.code
+      || inferGatewayErrorCode(status, message)
+    ).trim();
 
     if (!options._retriedSparse
       && (action === "dashboard-data" || action === "update-tickers")
@@ -2389,7 +2453,7 @@ async function requestGateway(params, options = {}) {
 
     throw buildAppError(code, message, {
       action,
-      status: response.status,
+      status,
       payload
     });
   }
