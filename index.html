@@ -61,7 +61,7 @@
     }
 
     .calculator-grid {
-      margin-top: 18px;
+      margin-top: 12px;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 14px;
@@ -137,6 +137,7 @@
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.96);
       color: var(--text);
+      font-size: 16px;
       outline: none;
       transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
     }
@@ -190,7 +191,7 @@
 
     .fib-result-price {
       margin: 0;
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 800;
       letter-spacing: -0.04em;
       color: var(--text);
@@ -211,7 +212,7 @@
 
     @media (max-width: 640px) {
       .calculator-card {
-        padding: 14px;
+        padding: 12px;
         border-radius: 18px;
       }
 
@@ -225,16 +226,34 @@
 
       .calculator-grid {
         grid-template-columns: 1fr;
-        gap: 10px;
+        gap: 8px;
       }
 
       .fib-card {
-        padding: 14px;
-        gap: 10px;
+        padding: 12px;
+        gap: 8px;
+        border-radius: 18px;
       }
 
       .fib-form {
-        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .fib-card-title {
+        font-size: 18px;
+      }
+
+      .fib-field input {
+        min-height: 42px;
+        padding: 0 10px;
+      }
+
+      .fib-result {
+        padding: 12px;
+      }
+
+      .fib-result-price {
+        font-size: 18px;
       }
     }
   </style>
@@ -254,7 +273,7 @@
             type="button"
             data-view="calculator"
             aria-pressed="false"
-          >피보계산</button>
+          >계산기</button>
           <button
             id="view-dashboard-button"
             class="view-switcher-button is-active"
@@ -412,15 +431,9 @@
     <section id="calculator-page" class="calculator-card panel" data-view-page="calculator" hidden>
       <div class="section-head calculator-head">
         <div>
-          <h2>피보 계산기</h2>
-          <p class="section-note">이 페이지는 로컬 계산 전용입니다. 다른 탭이 로딩 중이어도 바로 계산할 수 있습니다.</p>
+          <h2>계산기</h2>
         </div>
         <button id="calculator-reset-button" class="ghost-button" type="button">전체 초기화</button>
-      </div>
-
-      <div class="calculator-summary-bar">
-        <strong>구간 기준</strong>
-        <span>저가에서 고가까지의 구간 비율로 38.2%와 50.0% 가격, 저가 대비 등가율을 계산합니다.</span>
       </div>
 
       <div id="calculator-grid" class="calculator-grid"></div>
@@ -433,7 +446,7 @@
       type="button"
       data-view="calculator"
       aria-pressed="false"
-    >피보계산</button>
+    >계산기</button>
     <button
       class="mobile-bottom-nav-button is-active"
       type="button"
@@ -450,13 +463,13 @@
 
   <datalist id="ticker-list"></datalist>
 
-  <script src="./config.js?v=20260414h"></script>
+  <script src="./config.js?v=20260414i"></script>
   <script>
     window.PP_CONFIG = window.PP_CONFIG || {};
     window.PP_CONFIG.dashboardSourceMode = "sheet";
   </script>
-  <script src="./dashboard-api-source.js?v=20260414h"></script>
-  <script src="./app.js?v=20260414h"></script>
+  <script src="./dashboard-api-source.js?v=20260414i"></script>
+  <script src="./app.js?v=20260414i"></script>
   <script>
     (function () {
       const unlockEditableInputs = () => {
@@ -886,7 +899,7 @@
       const getHelperState = (computation) => {
         switch (computation.state) {
           case "empty":
-            return { text: "고가와 저가를 모두 입력하면 바로 계산됩니다.", error: false };
+            return { text: "", error: false };
           case "incomplete":
             return { text: "고가와 저가를 모두 입력해 주세요.", error: false };
           case "invalid":
@@ -911,7 +924,7 @@
         if (computation.state === "ready") {
           meta.textContent = `고저폭 ${formatPrice(computation.spread)} · 저가 대비 ${formatRate(computation.spreadRate)}`;
         } else {
-          meta.textContent = "다른 탭 로딩과 무관하게 이 카드 안에서만 계산됩니다.";
+          meta.textContent = "";
         }
 
         LEVELS.forEach((level) => {
@@ -931,7 +944,6 @@
             <div class="fib-card-head">
               <div>
                 <h3 class="fib-card-title">카드 ${index + 1}</h3>
-                <p class="fib-card-caption">고가와 저가만 넣으면 바로 계산됩니다.</p>
               </div>
               <span class="fib-card-badge">로컬 계산</span>
             </div>
