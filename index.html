@@ -8,6 +8,236 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=SUIT:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
+  <style>
+    .mobile-bottom-nav {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .calculator-card {
+      padding: 22px;
+    }
+
+    .calculator-head {
+      align-items: center;
+    }
+
+    .ghost-button {
+      min-height: 42px;
+      padding: 0 16px;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--text);
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+
+    .ghost-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(0, 95, 115, 0.24);
+      box-shadow: 0 16px 28px -24px rgba(15, 23, 42, 0.28);
+    }
+
+    .calculator-summary-bar {
+      margin-top: 18px;
+      display: grid;
+      gap: 6px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(15, 23, 42, 0.07);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.9)),
+        linear-gradient(120deg, rgba(0, 95, 115, 0.05), transparent 55%);
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .calculator-summary-bar strong {
+      color: var(--text);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .calculator-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .fib-card {
+      min-height: 100%;
+      padding: 18px;
+      border-radius: 22px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 250, 252, 0.92)),
+        linear-gradient(135deg, rgba(0, 95, 115, 0.05), transparent 48%);
+      display: grid;
+      gap: 12px;
+    }
+
+    .fib-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .fib-card-title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .fib-card-caption {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .fib-card-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(0, 95, 115, 0.08);
+      border: 1px solid rgba(0, 95, 115, 0.14);
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    .fib-form {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .fib-field {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .fib-field input {
+      width: 100%;
+      min-height: 46px;
+      padding: 0 12px;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.96);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .fib-field input:focus {
+      border-color: rgba(0, 95, 115, 0.5);
+      box-shadow: 0 0 0 4px rgba(0, 95, 115, 0.09);
+      transform: translateY(-1px);
+    }
+
+    .fib-helper,
+    .fib-meta {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--muted);
+      min-height: 19px;
+    }
+
+    .fib-helper.is-error {
+      color: #b42318;
+    }
+
+    .fib-results {
+      display: grid;
+      gap: 10px;
+    }
+
+    .fib-result {
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      background: rgba(15, 23, 42, 0.03);
+      display: grid;
+      gap: 6px;
+    }
+
+    .fib-result-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .fib-result-label {
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+
+    .fib-result-price {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--text);
+    }
+
+    .fib-result-rate {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--neutral);
+    }
+
+    @media (max-width: 1180px) {
+      .calculator-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .calculator-card {
+        padding: 14px;
+        border-radius: 18px;
+      }
+
+      .calculator-head {
+        gap: 10px;
+      }
+
+      .ghost-button {
+        width: 100%;
+      }
+
+      .calculator-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .fib-card {
+        padding: 14px;
+        gap: 10px;
+      }
+
+      .fib-form {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
   <main class="page-shell">
@@ -25,6 +255,13 @@
             data-view="dashboard"
             aria-pressed="true"
           >등가율</button>
+          <button
+            id="view-calculator-button"
+            class="view-switcher-button"
+            type="button"
+            data-view="calculator"
+            aria-pressed="false"
+          >피보계산</button>
           <button
             id="view-recommendation-button"
             class="view-switcher-button"
@@ -171,6 +408,23 @@
         데이터를 불러오면 여기에 날짜별 등가율 표가 표시됩니다.
       </div>
     </section>
+
+    <section id="calculator-page" class="calculator-card panel" data-view-page="calculator" hidden>
+      <div class="section-head calculator-head">
+        <div>
+          <h2>피보 계산기</h2>
+          <p class="section-note">이 페이지는 로컬 계산 전용입니다. 다른 탭이 로딩 중이어도 바로 계산할 수 있습니다.</p>
+        </div>
+        <button id="calculator-reset-button" class="ghost-button" type="button">전체 초기화</button>
+      </div>
+
+      <div class="calculator-summary-bar">
+        <strong>구간 기준</strong>
+        <span>저가에서 고가까지의 구간 비율로 38.2%와 50.0% 가격, 저가 대비 등가율을 계산합니다.</span>
+      </div>
+
+      <div id="calculator-grid" class="calculator-grid"></div>
+    </section>
   </main>
 
   <nav class="mobile-bottom-nav" aria-label="모바일 메뉴">
@@ -183,6 +437,12 @@
     <button
       class="mobile-bottom-nav-button"
       type="button"
+      data-view="calculator"
+      aria-pressed="false"
+    >피보계산</button>
+    <button
+      class="mobile-bottom-nav-button"
+      type="button"
       data-view="recommendations"
       aria-pressed="false"
     >종목추천</button>
@@ -190,13 +450,13 @@
 
   <datalist id="ticker-list"></datalist>
 
-  <script src="./config.js?v=20260414f"></script>
+  <script src="./config.js?v=20260414g"></script>
   <script>
     window.PP_CONFIG = window.PP_CONFIG || {};
     window.PP_CONFIG.dashboardSourceMode = "sheet";
   </script>
-  <script src="./dashboard-api-source.js?v=20260414f"></script>
-  <script src="./app.js?v=20260414f"></script>
+  <script src="./dashboard-api-source.js?v=20260414g"></script>
+  <script src="./app.js?v=20260414g"></script>
   <script>
     (function () {
       const unlockEditableInputs = () => {
@@ -511,6 +771,313 @@
       }
 
       window.addEventListener("load", scheduleUnlock);
+    })();
+  </script>
+  <script>
+    (function () {
+      const VIEW_STORAGE_KEY = "stock_lab_active_view";
+      const CALCULATOR_STORAGE_KEY = "pp_fib_calculator_cards_v1";
+      const CALCULATOR_CARD_COUNT = 6;
+      const LEVELS = [
+        { key: "382", label: "38.2%", ratio: 0.382 },
+        { key: "500", label: "50.0%", ratio: 0.5 }
+      ];
+
+      const calculatorElements = {
+        grid: document.getElementById("calculator-grid"),
+        resetButton: document.getElementById("calculator-reset-button"),
+        desktopButton: document.getElementById("view-calculator-button")
+      };
+
+      if (!calculatorElements.grid) return;
+
+      const calculatorState = {
+        cards: []
+      };
+
+      const createDefaultCards = () => Array.from({ length: CALCULATOR_CARD_COUNT }, () => ({
+        high: "",
+        low: ""
+      }));
+
+      const sanitizeCard = (card) => ({
+        high: String(card?.high || "").trim(),
+        low: String(card?.low || "").trim()
+      });
+
+      const loadCalculatorCards = () => {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(CALCULATOR_STORAGE_KEY) || "null");
+          if (Array.isArray(parsed) && parsed.length === CALCULATOR_CARD_COUNT) {
+            return parsed.map((card) => sanitizeCard(card));
+          }
+        } catch (error) {
+          console.warn("calculator storage restore", error);
+        }
+        return createDefaultCards();
+      };
+
+      const persistCalculatorCards = () => {
+        localStorage.setItem(CALCULATOR_STORAGE_KEY, JSON.stringify(calculatorState.cards));
+      };
+
+      const parseNumericInput = (value) => {
+        const normalized = String(value || "").replace(/,/g, "").trim();
+        if (!normalized) return null;
+        const parsed = Number(normalized);
+        return Number.isFinite(parsed) ? parsed : NaN;
+      };
+
+      const formatPrice = (value) => {
+        if (!Number.isFinite(value)) return "-";
+        return `${new Intl.NumberFormat("ko-KR", {
+          maximumFractionDigits: 0
+        }).format(Math.round(value))}원`;
+      };
+
+      const formatRate = (value) => {
+        if (!Number.isFinite(value)) return "-";
+        const sign = value > 0 ? "+" : "";
+        return `${sign}${(value * 100).toFixed(2)}%`;
+      };
+
+      const computeCard = (card) => {
+        const high = parseNumericInput(card.high);
+        const low = parseNumericInput(card.low);
+
+        if (high === null && low === null) {
+          return { state: "empty" };
+        }
+
+        if (high === null || low === null) {
+          return { state: "incomplete" };
+        }
+
+        if (!Number.isFinite(high) || !Number.isFinite(low)) {
+          return { state: "invalid" };
+        }
+
+        if (high <= 0 || low <= 0) {
+          return { state: "nonpositive" };
+        }
+
+        if (high < low) {
+          return { state: "range-error" };
+        }
+
+        const spread = high - low;
+        return {
+          state: "ready",
+          high,
+          low,
+          spread,
+          spreadRate: low === 0 ? null : (high / low) - 1,
+          levels: LEVELS.map((level) => {
+            const price = low + (spread * level.ratio);
+            return {
+              ...level,
+              price,
+              rate: low === 0 ? null : (price / low) - 1
+            };
+          })
+        };
+      };
+
+      const getHelperState = (computation) => {
+        switch (computation.state) {
+          case "empty":
+            return { text: "고가와 저가를 모두 입력하면 바로 계산됩니다.", error: false };
+          case "incomplete":
+            return { text: "고가와 저가를 모두 입력해 주세요.", error: false };
+          case "invalid":
+            return { text: "숫자만 입력해 주세요.", error: true };
+          case "nonpositive":
+            return { text: "고가와 저가는 0보다 커야 합니다.", error: true };
+          case "range-error":
+            return { text: "고가가 저가보다 크거나 같아야 합니다.", error: true };
+          default:
+            return { text: "", error: false };
+        }
+      };
+
+      const renderCardOutputs = (cardElement, computation) => {
+        const helper = cardElement.querySelector(".fib-helper");
+        const meta = cardElement.querySelector(".fib-meta");
+        const helperState = getHelperState(computation);
+
+        helper.textContent = helperState.text;
+        helper.classList.toggle("is-error", helperState.error);
+
+        if (computation.state === "ready") {
+          meta.textContent = `고저폭 ${formatPrice(computation.spread)} · 저가 대비 ${formatRate(computation.spreadRate)}`;
+        } else {
+          meta.textContent = "다른 탭 로딩과 무관하게 이 카드 안에서만 계산됩니다.";
+        }
+
+        LEVELS.forEach((level) => {
+          const result = cardElement.querySelector(`[data-level-key="${level.key}"]`);
+          if (!result) return;
+          const priceEl = result.querySelector(".fib-result-price");
+          const rateEl = result.querySelector(".fib-result-rate");
+          const match = computation.levels?.find((item) => item.key === level.key) || null;
+          priceEl.textContent = match ? formatPrice(match.price) : "-";
+          rateEl.textContent = match ? `저가 대비 등가율 ${formatRate(match.rate)}` : "저가 대비 등가율 -";
+        });
+      };
+
+      const renderCalculatorCards = () => {
+        calculatorElements.grid.innerHTML = calculatorState.cards.map((card, index) => `
+          <article class="fib-card" data-calc-card="${index}">
+            <div class="fib-card-head">
+              <div>
+                <h3 class="fib-card-title">카드 ${index + 1}</h3>
+                <p class="fib-card-caption">고가와 저가만 넣으면 바로 계산됩니다.</p>
+              </div>
+              <span class="fib-card-badge">로컬 계산</span>
+            </div>
+
+            <div class="fib-form">
+              <label class="fib-field">
+                <span>고가</span>
+                <input
+                  class="fib-input"
+                  type="text"
+                  inputmode="decimal"
+                  placeholder="예: 385000"
+                  data-card-index="${index}"
+                  data-field="high"
+                  value="${escapeHtml(card.high)}"
+                >
+              </label>
+              <label class="fib-field">
+                <span>저가</span>
+                <input
+                  class="fib-input"
+                  type="text"
+                  inputmode="decimal"
+                  placeholder="예: 241000"
+                  data-card-index="${index}"
+                  data-field="low"
+                  value="${escapeHtml(card.low)}"
+                >
+              </label>
+            </div>
+
+            <p class="fib-helper"></p>
+            <p class="fib-meta"></p>
+
+            <div class="fib-results">
+              ${LEVELS.map((level) => `
+                <section class="fib-result" data-level-key="${level.key}">
+                  <div class="fib-result-top">
+                    <span class="fib-result-label">${level.label}</span>
+                  </div>
+                  <p class="fib-result-price">-</p>
+                  <p class="fib-result-rate">저가 대비 등가율 -</p>
+                </section>
+              `).join("")}
+            </div>
+          </article>
+        `).join("");
+
+        calculatorElements.grid.querySelectorAll("[data-calc-card]").forEach((cardElement) => {
+          renderCardOutputs(cardElement, computeCard(calculatorState.cards[Number(cardElement.dataset.calcCard)]));
+        });
+      };
+
+      const bindCalculatorEvents = () => {
+        calculatorElements.grid.querySelectorAll(".fib-input").forEach((input) => {
+          if (input.dataset.bound === "true") return;
+          input.dataset.bound = "true";
+          input.addEventListener("input", (event) => {
+            const target = event.currentTarget;
+            const cardIndex = Number(target.dataset.cardIndex);
+            const field = String(target.dataset.field || "");
+            if (!Number.isInteger(cardIndex) || !field) return;
+            calculatorState.cards[cardIndex][field] = target.value;
+            persistCalculatorCards();
+            const cardElement = target.closest("[data-calc-card]");
+            if (cardElement) {
+              renderCardOutputs(cardElement, computeCard(calculatorState.cards[cardIndex]));
+            }
+          });
+        });
+
+        if (calculatorElements.resetButton && calculatorElements.resetButton.dataset.bound !== "true") {
+          calculatorElements.resetButton.dataset.bound = "true";
+          calculatorElements.resetButton.addEventListener("click", () => {
+            calculatorState.cards = createDefaultCards();
+            persistCalculatorCards();
+            renderCalculatorCards();
+            bindCalculatorEvents();
+          });
+        }
+      };
+
+      const getAllViewButtons = () => (
+        [...document.querySelectorAll(".view-switcher-button[data-view], .mobile-bottom-nav-button[data-view]")]
+      );
+
+      const installViewPatches = () => {
+        normalizeViewName = function (view) {
+          const normalized = String(view || "").trim().toLowerCase();
+          if (normalized === "recommendations" || normalized === "calculator") return normalized;
+          return "dashboard";
+        };
+
+        renderActiveView = function () {
+          const activeView = normalizeViewName(state.activeView);
+          document.querySelectorAll("[data-view-page]").forEach((section) => {
+            if (!section) return;
+            section.hidden = section.dataset.viewPage !== activeView;
+          });
+
+          getAllViewButtons().forEach((button) => {
+            const isActive = button.dataset.view === activeView;
+            button.classList.toggle("is-active", isActive);
+            button.setAttribute("aria-pressed", String(isActive));
+          });
+        };
+
+        setActiveView = function (view, options = {}) {
+          const nextView = normalizeViewName(view);
+          state.activeView = nextView;
+          renderActiveView();
+
+          if (typeof renderRecommendationFilterPanel === "function") {
+            renderRecommendationFilterPanel();
+          }
+
+          if (options.persist !== false) {
+            localStorage.setItem(VIEW_STORAGE_KEY, nextView);
+          }
+
+          if (nextView === "recommendations"
+            && options.warmup !== false
+            && typeof warmRecommendationUniverse === "function") {
+            warmRecommendationUniverse(state.recommendations.filters, { silent: true }).catch(() => {});
+          }
+        };
+
+        if (calculatorElements.desktopButton && calculatorElements.desktopButton.dataset.bound !== "true") {
+          calculatorElements.desktopButton.dataset.bound = "true";
+          calculatorElements.desktopButton.addEventListener("click", () => {
+            setActiveView("calculator");
+          });
+        }
+
+        renderActiveView();
+
+        const savedView = String(localStorage.getItem(VIEW_STORAGE_KEY) || "").trim().toLowerCase();
+        if (savedView === "calculator") {
+          setActiveView("calculator", { persist: false, warmup: false });
+        }
+      };
+
+      calculatorState.cards = loadCalculatorCards();
+      renderCalculatorCards();
+      bindCalculatorEvents();
+      installViewPatches();
     })();
   </script>
 </body>
