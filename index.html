@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>월간 등가률 보드</title>
+  <title>월간 등가율 보드</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=SUIT:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -168,7 +168,7 @@
       </div>
 
       <div id="empty-state" class="empty-state">
-        데이터를 불러오면 여기에 날짜별 등가률 표가 표시됩니다.
+        데이터를 불러오면 여기에 날짜별 등가율 표가 표시됩니다.
       </div>
     </section>
   </main>
@@ -190,8 +190,12 @@
 
   <datalist id="ticker-list"></datalist>
 
-  <script src="./config.js"></script>
-  <script src="./dashboard-api-source.js"></script>
-  <script src="./app.js"></script>
+  <script src="./config.js?v=20260414a"></script>
+  <script>
+    window.PP_CONFIG = window.PP_CONFIG || {};
+    window.PP_CONFIG.dashboardSourceMode = "sheet";
+  </script>
+  <script src="./dashboard-api-source.js?v=20260414a"></script>
+  <script src="./app.js?v=20260414a"></script>
 </body>
 </html>
