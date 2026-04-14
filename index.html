@@ -463,13 +463,13 @@
 
   <datalist id="ticker-list"></datalist>
 
-  <script src="./config.js?v=20260414i"></script>
+  <script src="./config.js?v=20260414j"></script>
   <script>
     window.PP_CONFIG = window.PP_CONFIG || {};
     window.PP_CONFIG.dashboardSourceMode = "sheet";
   </script>
-  <script src="./dashboard-api-source.js?v=20260414i"></script>
-  <script src="./app.js?v=20260414i"></script>
+  <script src="./dashboard-api-source.js?v=20260414j"></script>
+  <script src="./app.js?v=20260414j"></script>
   <script>
     (function () {
       const unlockEditableInputs = () => {
@@ -884,13 +884,13 @@
           high,
           low,
           spread,
-          spreadRate: low === 0 ? null : (high / low) - 1,
+          spreadRate: low === 0 ? null : -((high / low) - 1),
           levels: LEVELS.map((level) => {
             const price = low + (spread * level.ratio);
             return {
               ...level,
               price,
-              rate: low === 0 ? null : (price / low) - 1
+              rate: low === 0 ? null : -((price / low) - 1)
             };
           })
         };
