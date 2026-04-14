@@ -190,12 +190,44 @@
 
   <datalist id="ticker-list"></datalist>
 
-  <script src="./config.js?v=20260414a"></script>
+  <script src="./config.js?v=20260414c"></script>
   <script>
     window.PP_CONFIG = window.PP_CONFIG || {};
     window.PP_CONFIG.dashboardSourceMode = "sheet";
   </script>
-  <script src="./dashboard-api-source.js?v=20260414a"></script>
-  <script src="./app.js?v=20260414a"></script>
+  <script src="./dashboard-api-source.js?v=20260414c"></script>
+  <script src="./app.js?v=20260414c"></script>
+  <script>
+    (function () {
+      const unlockEditableInputs = () => {
+        document.querySelectorAll('.slot-input[data-editable="true"]').forEach((input) => {
+          input.disabled = false;
+        });
+      };
+
+      const scheduleUnlock = () => {
+        window.setTimeout(unlockEditableInputs, 0);
+        window.setTimeout(unlockEditableInputs, 400);
+        window.setTimeout(unlockEditableInputs, 1200);
+      };
+
+      const watchSlotGrid = () => {
+        const slotGrid = document.getElementById('slot-grid');
+        if (!slotGrid) {
+          window.setTimeout(watchSlotGrid, 300);
+          return;
+        }
+
+        const observer = new MutationObserver(() => {
+          scheduleUnlock();
+        });
+        observer.observe(slotGrid, { childList: true, subtree: true });
+        scheduleUnlock();
+      };
+
+      window.addEventListener('load', scheduleUnlock);
+      watchSlotGrid();
+    })();
+  </script>
 </body>
 </html>
