@@ -2,6 +2,7 @@ const MARKET_TIMEZONE = "Asia/Seoul";
 const SLOT_COUNT = 6;
 const STORAGE_LAST_DATE = "stock_lab_selected_date";
 const STORAGE_ACTIVE_VIEW = "stock_lab_active_view";
+const STORAGE_DASHBOARD_SOURCE_MODE = "stock_lab_dashboard_source_mode";
 const RECOMMENDATION_GATEWAY_COOLDOWN_MS = 8000;
 const RECOMMENDATION_RUN_COOLDOWN_MS = 12000;
 const RECOMMENDATION_WARMUP_MAX_PERIOD_MONTHS = 12;
@@ -24,6 +25,7 @@ const DEFAULT_GATEWAY_URL = String(
   || window.STOCK_LAB_CONFIG?.gatewayUrl
   || ""
 ).trim();
+const DEFAULT_DASHBOARD_SOURCE_MODE = "api";
 const recommendationWarmupState = {
   completedKeys: new Set(),
   pending: new Map()
@@ -141,8 +143,6 @@ const elements = {
   recommendationMode: document.getElementById("recommendation-mode"),
   recommendationLookback: document.getElementById("recommendation-lookback"),
   recommendationTolerance: document.getElementById("recommendation-tolerance"),
-  recommendationSort: document.getElementById("recommendation-sort"),
-  recommendationSlotTarget: document.getElementById("recommendation-slot-target"),
   recommendationSummary: document.getElementById("recommendation-summary"),
   recommendationList: document.getElementById("recommendation-list"),
   dashboardViewButton: document.getElementById("view-dashboard-button"),
@@ -369,14 +369,6 @@ function syncRecommendationControls(filters = state.recommendations.filters) {
   if (elements.recommendationMode) elements.recommendationMode.value = String(filters.mode || "near");
   if (elements.recommendationLookback) elements.recommendationLookback.value = String(filters.lookbackDays || 1);
   if (elements.recommendationTolerance) elements.recommendationTolerance.value = String(filters.tolerance);
-  if (elements.recommendationSort) elements.recommendationSort.value = String(filters.sortBy || "distance_abs");
-  renderRecommendationSlotOptions(filters.slotTarget);
-  if (elements.recommendationSlotTarget) {
-    elements.recommendationSlotTarget.value = String(filters.slotTarget || "auto");
-    if (elements.recommendationSlotTarget.value !== String(filters.slotTarget || "auto")) {
-      elements.recommendationSlotTarget.value = "auto";
-    }
-  }
 }
 
 function formatRecommendationLevelLabel(value) {
@@ -492,9 +484,7 @@ function applyStaticUiText() {
     ["recommendation-level", "되돌림 구간"],
     ["recommendation-mode", "매매 신호"],
     ["recommendation-lookback", "신호 탐색"],
-    ["recommendation-tolerance", "허용 괴리"],
-    ["recommendation-sort", "우선순위"],
-    ["recommendation-slot-target", "담기 위치"]
+    ["recommendation-tolerance", "허용 괴리"]
   ]);
   labelMap.forEach((text, id) => {
     const label = recommendationSection?.querySelector(`label[for='${id}'] > span`);
@@ -523,15 +513,6 @@ function applyStaticUiText() {
   updateOptionText(elements.recommendationTolerance, "0.01", "±1.0%");
   updateOptionText(elements.recommendationTolerance, "0.015", "±1.5%");
   updateOptionText(elements.recommendationTolerance, "0.02", "±2.0%");
-  updateOptionText(elements.recommendationSort, "distance_abs", "괴리율 작은 순");
-  updateOptionText(elements.recommendationSort, "distance_desc", "상단 괴리 우선");
-  updateOptionText(elements.recommendationSort, "distance_asc", "하단 괴리 우선");
-  updateOptionText(elements.recommendationSort, "name", "종목명 순");
-
-  const sortField = recommendationSection?.querySelector("label[for='recommendation-sort']");
-  const slotTargetField = recommendationSection?.querySelector("label[for='recommendation-slot-target']");
-  if (sortField) sortField.hidden = true;
-  if (slotTargetField) slotTargetField.hidden = true;
 
   setRecommendationSummaryVisibility(state.recommendations.summary);
   scheduleRecommendationCooldownTicker();
@@ -847,9 +828,7 @@ function setRecommendationBusyState(isBusy) {
     elements.recommendationLevel,
     elements.recommendationMode,
     elements.recommendationLookback,
-    elements.recommendationTolerance,
-    elements.recommendationSort,
-    elements.recommendationSlotTarget
+    elements.recommendationTolerance
   ].forEach((element) => {
     if (element) element.disabled = Boolean(isBusy);
   });
@@ -2180,9 +2159,7 @@ function setRecommendationBusyState(isBusy) {
     elements.recommendationLevel,
     elements.recommendationMode,
     elements.recommendationLookback,
-    elements.recommendationTolerance,
-    elements.recommendationSort,
-    elements.recommendationSlotTarget
+    elements.recommendationTolerance
   ].forEach((element) => {
     if (element) element.disabled = busy;
   });
@@ -2374,8 +2351,21 @@ async function requestGateway(params, options = {}) {
   }
 
   if (!response.ok || !payload?.ok) {
-    const message = String(payload?.message || `게이트웨이 요청이 실패했습니다. (${response.status})`).trim();
-    const code = String(payload?.code || payload?.errorCode || inferGatewayErrorCode(response.status, message)).trim();
+    const gatewayError = payload?.error && typeof payload.error === "object"
+      ? payload.error
+      : null;
+    const message = String(
+      payload?.message
+      || gatewayError?.message
+      || `게이트웨이 요청이 실패했습니다. (${response.status})`
+    ).trim();
+    const status = Number(gatewayError?.status || payload?.status || response.status);
+    const code = String(
+      payload?.code
+      || payload?.errorCode
+      || gatewayError?.code
+      || inferGatewayErrorCode(status, message)
+    ).trim();
 
     if (!options._retriedSparse
       && (action === "dashboard-data" || action === "update-tickers")
@@ -2389,7 +2379,7 @@ async function requestGateway(params, options = {}) {
 
     throw buildAppError(code, message, {
       action,
-      status: response.status,
+      status,
       payload
     });
   }
@@ -2528,7 +2518,29 @@ async function loadRecommendations() {
   }
 }
 
-async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
+function getDashboardSourceMode() {
+  const configured = String(window.PP_CONFIG?.dashboardSourceMode || DEFAULT_DASHBOARD_SOURCE_MODE).trim().toLowerCase();
+  const persisted = String(localStorage.getItem(STORAGE_DASHBOARD_SOURCE_MODE) || configured).trim().toLowerCase();
+  return persisted === "sheet" ? "sheet" : "api";
+}
+
+async function loadDashboardPayloadFromApi(date) {
+  if (!window.DashboardApiSource?.loadPayload) {
+    throw buildAppError(APP_ERROR_CODES.gatewayMissing, "API 데이터 소스 모듈을 찾지 못했습니다.");
+  }
+
+  return window.DashboardApiSource.loadPayload({
+    date,
+    getAllSlots,
+    loadMonthlySeriesForTarget,
+    loadSnapshotForTarget,
+    applySnapshotToSeries,
+    buildDashboardPayload,
+    resolveMarketSession
+  });
+}
+
+async function loadDashboardPayloadFromSheetWithRetry(date, maxAttempts = 3) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -2553,6 +2565,21 @@ async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
   }
 
   throw lastError || buildAppError(APP_ERROR_CODES.unknown, "월간표를 불러오지 못했습니다.");
+}
+
+async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
+  const sourceMode = getDashboardSourceMode();
+  if (sourceMode === "sheet") {
+    return loadDashboardPayloadFromSheetWithRetry(date, maxAttempts);
+  }
+
+  try {
+    return await loadDashboardPayloadFromApi(date);
+  } catch (error) {
+    console.warn("api dashboard source failed, fallback to sheet", error);
+    setStatus("API 조회에 실패해 스프레드시트 방식으로 전환합니다...", "loading");
+    return loadDashboardPayloadFromSheetWithRetry(date, maxAttempts);
+  }
 }
 
 async function loadDashboard(date = getTodayKstDate()) {
