@@ -1440,58 +1440,25 @@ function attachSlotEvents() {
   });
 }
 
-async function saveTickerCodes(codes, maxAttempts = 3) {
-  let lastError = null;
+async function saveTickerCodes(codes) {
   const targetDate = elements.dateInput.value || state.selectedDate || getTodayKstDate();
+  await requestGateway({
+    action: "update-tickers",
+    tickers: codes.join(","),
+    date: targetDate
+  });
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      const payload = await requestGateway({
-        action: "update-tickers",
-        tickers: codes.join(","),
-        date: targetDate
-      });
-
+  loadDashboardPayloadWithRetry(targetDate)
+    .then((payload) => {
       renderDashboard(payload);
-      return payload;
-    } catch (error) {
-      lastError = error;
-      const code = String(error?.code || "").trim();
-      const retryable = [
-        APP_ERROR_CODES.monthlyDataSparse,
-        APP_ERROR_CODES.gatewayRequestFailed,
-        "PP-SERVER"
-      ].includes(code);
+      setStatus("저장된 종목으로 월간표를 갱신했습니다.", "success");
+    })
+    .catch((error) => {
+      console.warn("dashboard refresh after save", error);
+      setStatus("종목 저장 완료 · 월간표 갱신 대기 중", "loading");
+    });
 
-      if (!retryable || attempt >= maxAttempts) {
-        throw error;
-      }
-
-      setStatus(`종목 저장 재시도 중... (${attempt}/${maxAttempts})`, "loading");
-      await waitMs(1200 * attempt);
-    }
-  }
-
-  const lastCode = String(lastError?.code || "").trim();
-  if ([APP_ERROR_CODES.monthlyDataSparse, APP_ERROR_CODES.gatewayRequestFailed, "PP-SERVER"].includes(lastCode)) {
-    setStatus("종목 저장은 반영되었는지 확인 중입니다...", "loading");
-
-    for (let attempt = 1; attempt <= 10; attempt += 1) {
-      try {
-        const payload = await requestGateway({ action: "dashboard-data", date: targetDate });
-        renderDashboard(payload);
-        return payload;
-      } catch (error) {
-        const code = String(error?.code || "").trim();
-        if (code !== APP_ERROR_CODES.monthlyDataSparse || attempt >= 10) {
-          throw error;
-        }
-        await waitMs(1500);
-      }
-    }
-  }
-
-  throw lastError || buildAppError(APP_ERROR_CODES.unknown, "종목 저장에 실패했습니다.");
+  return { ok: true, pendingRecalc: true };
 }
 
 async function saveTickers() {

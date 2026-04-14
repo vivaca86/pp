@@ -205,6 +205,7 @@ function handleUpdateTickers_(params) {
   var context = openDashboardContext_();
   var requestedDate = params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet);
   var requestedCodes = parseTickerList_(params.tickers);
+  var waitForStablePayload = String(params.sync || '').trim().toLowerCase() === 'true';
   var resolvedCodes = requestedCodes.map(function (item) {
     return item ? resolveStock_(item).code : '';
   });
@@ -215,8 +216,19 @@ function handleUpdateTickers_(params) {
     setSelectedDate_(context.controlSheet, requestedDate);
   }
 
-  waitForDashboardRefresh_(context, requestedDate, resolvedCodes);
-  return buildStableDashboardPayload_(context);
+  if (waitForStablePayload) {
+    waitForDashboardRefresh_(context, requestedDate, resolvedCodes);
+    return buildStableDashboardPayload_(context);
+  }
+
+  return {
+    ok: true,
+    accepted: true,
+    pendingRecalc: true,
+    selectedDate: requestedDate,
+    tickers: resolvedCodes,
+    note: '티커 저장을 접수했습니다. 월간표는 백그라운드에서 갱신됩니다.'
+  };
 }
 
 function openDashboardContext_() {
@@ -2330,4 +2342,3 @@ function adminClearGatewayCache() {
     deletedProperties: deleted
   };
 }
-
