@@ -1282,6 +1282,28 @@ function resolveTickerCode(rawValue) {
   return raw;
 }
 
+async function resolveTickerCodeForSave(rawValue) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return "";
+
+  const localResolved = resolveTickerCode(raw);
+  if (normalizeTicker(localResolved) !== normalizeTicker(raw) || /^[A-Z0-9]{6,9}$/.test(normalizeTicker(localResolved))) {
+    return localResolved;
+  }
+
+  if (!state.gatewayUrl) return localResolved;
+
+  try {
+    const payload = await requestGateway({ action: "stock-search", q: raw });
+    const first = Array.isArray(payload?.items) ? payload.items[0] : null;
+    if (first?.code) return normalizeTicker(first.code);
+  } catch (error) {
+    console.warn("stock-search fallback", error);
+  }
+
+  return localResolved;
+}
+
 function createDefaultEditableSlots() {
   return Array.from({ length: SLOT_COUNT }, (_, index) => {
     const code = DEFAULT_SLOT_CODES[index] || "";
@@ -1418,15 +1440,38 @@ function attachSlotEvents() {
   });
 }
 
-async function saveTickerCodes(codes) {
-  const payload = await requestGateway({
-    action: "update-tickers",
-    tickers: codes.join(","),
-    date: elements.dateInput.value || state.selectedDate || getTodayKstDate()
-  });
+async function saveTickerCodes(codes, maxAttempts = 3) {
+  let lastError = null;
 
-  renderDashboard(payload);
-  return payload;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const payload = await requestGateway({
+        action: "update-tickers",
+        tickers: codes.join(","),
+        date: elements.dateInput.value || state.selectedDate || getTodayKstDate()
+      });
+
+      renderDashboard(payload);
+      return payload;
+    } catch (error) {
+      lastError = error;
+      const code = String(error?.code || "").trim();
+      const retryable = [
+        APP_ERROR_CODES.monthlyDataSparse,
+        APP_ERROR_CODES.gatewayRequestFailed,
+        "PP-SERVER"
+      ].includes(code);
+
+      if (!retryable || attempt >= maxAttempts) {
+        throw error;
+      }
+
+      setStatus(`종목 저장 재시도 중... (${attempt}/${maxAttempts})`, "loading");
+      await waitMs(1200 * attempt);
+    }
+  }
+
+  throw lastError || buildAppError(APP_ERROR_CODES.unknown, "종목 저장에 실패했습니다.");
 }
 
 async function saveTickers() {
@@ -1442,7 +1487,7 @@ async function saveTickers() {
       throw new Error("편집 가능한 종목 입력칸을 모두 찾지 못했습니다.");
     }
 
-    const tickers = inputs.map((input) => resolveTickerCode(input.value));
+    const tickers = await Promise.all(inputs.map((input) => resolveTickerCodeForSave(input.value)));
     await saveTickerCodes(tickers);
     setStatus("종목 저장 완료", "success");
   } finally {
