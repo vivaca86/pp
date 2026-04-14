@@ -190,13 +190,13 @@
 
   <datalist id="ticker-list"></datalist>
 
-  <script src="./config.js?v=20260414d"></script>
+  <script src="./config.js?v=20260414e"></script>
   <script>
     window.PP_CONFIG = window.PP_CONFIG || {};
     window.PP_CONFIG.dashboardSourceMode = "sheet";
   </script>
-  <script src="./dashboard-api-source.js?v=20260414d"></script>
-  <script src="./app.js?v=20260414d"></script>
+  <script src="./dashboard-api-source.js?v=20260414e"></script>
+  <script src="./app.js?v=20260414e"></script>
   <script>
     (function () {
       const unlockEditableInputs = () => {
@@ -210,6 +210,12 @@
         window.setTimeout(unlockEditableInputs, 400);
         window.setTimeout(unlockEditableInputs, 1200);
       };
+
+      const isEditableSlotInput = (target) => (
+        Boolean(target)
+        && typeof target.matches === "function"
+        && target.matches('.slot-input[data-editable="true"]')
+      );
 
       const cloneEditableSlots = () => state.editableSlots.map((slot) => ({
         id: slot.id,
@@ -308,7 +314,40 @@
           };
         }
 
+        if (typeof saveTickers === "function") {
+          const originalSaveTickers = saveTickers;
+          saveTickers = async function () {
+            const composingInput = document.querySelector('.slot-input[data-editable="true"][data-composing="true"]');
+            if (composingInput) {
+              scheduleUnlock();
+              return { ok: false, skipped: true, reason: "composing" };
+            }
+            return originalSaveTickers();
+          };
+        }
+
         scheduleUnlock();
+      };
+
+      const installCompositionGuards = () => {
+        document.addEventListener("compositionstart", (event) => {
+          if (!isEditableSlotInput(event.target)) return;
+          event.target.dataset.composing = "true";
+        }, true);
+
+        document.addEventListener("compositionend", (event) => {
+          if (!isEditableSlotInput(event.target)) return;
+          event.target.dataset.composing = "false";
+        }, true);
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter") return;
+          if (!isEditableSlotInput(event.target)) return;
+          if (event.isComposing || event.keyCode === 229 || event.target.dataset.composing === "true") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, true);
       };
 
       const watchSlotGrid = () => {
@@ -326,6 +365,7 @@
       };
 
       const boot = () => {
+        installCompositionGuards();
         installRuntimePatches();
         watchSlotGrid();
         scheduleUnlock();
