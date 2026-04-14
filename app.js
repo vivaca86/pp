@@ -1259,6 +1259,9 @@ async function resolveStockInput(rawValue) {
 function resolveTickerCode(rawValue) {
   const raw = String(rawValue || "").trim();
   if (!raw) return "";
+  if (raw.includes(",")) {
+    throw new Error(`종목명에 쉼표(,)는 사용할 수 없습니다: ${raw}`);
+  }
 
   const exact = findCatalogItem(raw);
   if (exact) return normalizeTicker(exact.code);
@@ -1268,7 +1271,15 @@ function resolveTickerCode(rawValue) {
     return ticker;
   }
 
-  throw new Error(`종목을 찾지 못했습니다: ${raw}`);
+  const needle = normalizeSearchText(raw);
+  const fuzzy = state.catalog.find((item) => {
+    const codeKey = normalizeSearchText(item.code);
+    const nameKey = normalizeSearchText(item.name);
+    return codeKey.includes(needle) || nameKey.includes(needle);
+  });
+  if (fuzzy) return normalizeTicker(fuzzy.code);
+
+  return raw;
 }
 
 function createDefaultEditableSlots() {
