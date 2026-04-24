@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -884,13 +884,13 @@
           high,
           low,
           spread,
-          spreadRate: low === 0 ? null : -((high / low) - 1),
+          spreadRate: high === 0 ? null : ((low / high) - 1),
           levels: LEVELS.map((level) => {
-            const price = low + (spread * level.ratio);
+            const price = high - (spread * level.ratio);
             return {
               ...level,
               price,
-              rate: low === 0 ? null : -((price / low) - 1)
+              rate: high === 0 ? null : ((price / high) - 1)
             };
           })
         };
@@ -922,7 +922,7 @@
         helper.classList.toggle("is-error", helperState.error);
 
         if (computation.state === "ready") {
-          meta.textContent = `고저폭 ${formatPrice(computation.spread)} · 저가 대비 ${formatRate(computation.spreadRate)}`;
+          meta.textContent = `고저폭 ${formatPrice(computation.spread)} · 고가 대비 ${formatRate(computation.spreadRate)}`;
         } else {
           meta.textContent = "";
         }
@@ -934,7 +934,7 @@
           const rateEl = result.querySelector(".fib-result-rate");
           const match = computation.levels?.find((item) => item.key === level.key) || null;
           priceEl.textContent = match ? formatPrice(match.price) : "-";
-          rateEl.textContent = match ? `저가 대비 등가율 ${formatRate(match.rate)}` : "저가 대비 등가율 -";
+          rateEl.textContent = match ? `고가 대비 등가율 ${formatRate(match.rate)}` : "고가 대비 등가율 -";
         });
       };
 
@@ -945,7 +945,7 @@
               <div>
                 <h3 class="fib-card-title">카드 ${index + 1}</h3>
               </div>
-              <span class="fib-card-badge">로컬 계산</span>
+              <span class="fib-card-badge">고가 기준</span>
             </div>
 
             <div class="fib-form">
@@ -985,7 +985,7 @@
                     <span class="fib-result-label">${level.label}</span>
                   </div>
                   <p class="fib-result-price">-</p>
-                  <p class="fib-result-rate">저가 대비 등가율 -</p>
+                  <p class="fib-result-rate">고가 대비 등가율 -</p>
                 </section>
               `).join("")}
             </div>
