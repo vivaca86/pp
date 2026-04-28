@@ -2,4 +2,5 @@ node_modules/
 .wrangler/
 .dev.vars
 .cloudflare-secrets.ps1
+test-artifacts/
 *.log
