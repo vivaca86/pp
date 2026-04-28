@@ -24,6 +24,13 @@ jobs:
       - name: Fetch dashboard snapshot
         run: node .github/scripts/update-dashboard-snapshot.mjs
 
+      - name: Upload snapshot to Cloudflare KV
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_KV_NAMESPACE_ID: ${{ secrets.CLOUDFLARE_KV_NAMESPACE_ID }}
+        run: node .github/scripts/upload-dashboard-snapshot-to-kv.mjs
+
       - name: Commit snapshot
         run: |
           if git diff --quiet -- dashboard-latest.json; then

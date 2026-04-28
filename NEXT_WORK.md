@@ -42,6 +42,11 @@ Status update on 2026-04-28:
    - Expected user-facing change: dashboard snapshot display can drop from the current 2-3s Apps Script path toward roughly sub-second to 1s depending on the store/CDN.
    - Cost/complexity note: likely free at this scale, but adds account/API-token/CORS/fallback setup.
    - Future optional upgrade: replace GitHub Pages JSON with Cloudflare KV/R2 if lower update latency or fewer git commits are needed.
+   - Cloudflare KV + Worker prep was added on 2026-04-28:
+     - `wrangler.jsonc` deploys the Worker from `workers/dashboard-snapshot.js`.
+     - First Cloudflare deploy can auto-provision the KV namespace and bind it as `PP_DASHBOARD_SNAPSHOT`.
+     - `.github/scripts/upload-dashboard-snapshot-to-kv.mjs` uploads `dashboard-latest.json` to KV when the Cloudflare GitHub secrets exist.
+     - Keep `config.js` on `./dashboard-latest.json` until the Worker URL is known, then switch `dashboardSnapshotUrl` to `https://pp.<workers-subdomain>.workers.dev/dashboard-latest.json`.
 
 2. Automate Apps Script deployment. **Done locally on 2026-04-28.**
    - Goal: stop requiring the user to paste code and manually deploy each backend change.

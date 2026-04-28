@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pp",
+  "main": "workers/dashboard-snapshot.js",
+  "compatibility_date": "2026-04-28",
+  "workers_dev": true,
+  "keep_vars": true,
+  "vars": {
+    "SNAPSHOT_KEY": "dashboard-latest.json",
+    "FALLBACK_SNAPSHOT_URL": "https://vivaca86.github.io/pp/dashboard-latest.json"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "PP_DASHBOARD_SNAPSHOT"
+    }
+  ]
+}

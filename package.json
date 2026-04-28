@@ -1,0 +1,13 @@
+{
+  "name": "pp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy:worker": "wrangler deploy",
+    "check:worker": "node --check workers/dashboard-snapshot.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.85.0"
+  }
+}
