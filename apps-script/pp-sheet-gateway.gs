@@ -1611,20 +1611,12 @@ function resolveStock_(input) {
   }
 
   var exactCode = sanitizeStockCode_(raw);
-  if (exactCode) {
-    var catalog = getStockCatalog_();
-    for (var i = 0; i < catalog.length; i += 1) {
-      if (catalog[i].code === exactCode) {
-        return catalog[i];
-      }
-    }
-    if (/^[A-Z0-9]{6,9}$/.test(exactCode)) {
-      return {
-        code: exactCode,
-        name: raw,
-        market: 'KRX'
-      };
-    }
+  if (/^[A-Z0-9]{6,9}$/.test(exactCode)) {
+    return {
+      code: exactCode,
+      name: raw,
+      market: 'KRX'
+    };
   }
 
   var matches = searchStockCatalog_(raw);

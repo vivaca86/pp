@@ -130,7 +130,7 @@
             const payload = await requestGatewayWithTimeout({
               action: "dashboard-data",
               date: targetDate
-            }, 5000);
+            }, 25000);
 
             if (!areTickersApplied(payload, codes)) {
               throw buildAppError(
