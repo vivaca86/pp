@@ -226,6 +226,16 @@ function formatTimestamp(value) {
   }).format(date);
 }
 
+function formatAgeSeconds(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds < 0) return "";
+  if (seconds < 60) return "방금";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}시간 전`;
+}
+
 function formatPercent(value, digits = 2) {
   if (!Number.isFinite(value)) return "-";
   const sign = value > 0 ? "+" : "";
@@ -1484,7 +1494,12 @@ function renderDashboard(payload, options = {}) {
 
   elements.dateInput.value = payload.selectedDate || "";
   elements.dateInput.max = payload.today || getTodayKstDate();
-  elements.updatedAt.textContent = `마지막 동기화 ${formatTimestamp(payload.updatedAt)}`;
+  const snapshotUpdatedAt = payload.snapshotUpdatedAt || payload.updatedAt;
+  const snapshotAgeText = payload.snapshotUpdatedAt ? formatAgeSeconds(payload.snapshotAgeSeconds) : "";
+  elements.updatedAt.textContent = [
+    `마지막 동기화 ${formatTimestamp(snapshotUpdatedAt)}`,
+    snapshotAgeText ? `스냅샷 ${snapshotAgeText}` : ""
+  ].filter(Boolean).join(" · ");
 
   renderSlots(payload.slots);
   renderTable(payload);

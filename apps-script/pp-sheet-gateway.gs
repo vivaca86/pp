@@ -98,7 +98,12 @@ var PP_SHEET_GATEWAY = {
   recalcAttempts: 14,
   recalcPauseMs: 1200,
   dashboardCacheMinutes: 360,
-  dashboardTodayCacheSeconds: 60
+  dashboardTodayCacheSeconds: 60,
+  dashboardSnapshotCacheHours: 6,
+  dashboardSnapshotMaxAgeSeconds: 300,
+  dashboardSnapshotTriggerMinutes: 1,
+  dashboardSnapshotMarketOpenMinute: 8 * 60 + 55,
+  dashboardSnapshotMarketCloseMinute: 15 * 60 + 40
 };
 
 function doGet(e) {
@@ -122,6 +127,8 @@ function routeGatewayAction_(action, params) {
       return handleStockSearch_(params);
     case 'dashboard-data':
       return handleDashboardData_(params);
+    case 'dashboard-snapshot-status':
+      return handleDashboardSnapshotStatus_(params);
     case 'update-tickers':
       return handleUpdateTickers_(params);
     case 'equity-month':
@@ -191,9 +198,15 @@ function handleStockSearch_(params) {
 }
 
 function handleDashboardData_(params) {
+  var requestedDateParam = params.date ? coerceIsoDate_(params.date) : '';
+  var latestSnapshot = loadLatestDashboardSnapshot_(requestedDateParam, false);
+  if (latestSnapshot) {
+    return latestSnapshot;
+  }
+
   var context = openDashboardContext_();
   var currentDate = getSelectedDateIso_(context.controlSheet);
-  var requestedDate = params.date ? coerceIsoDate_(params.date) : currentDate;
+  var requestedDate = requestedDateParam || currentDate;
 
   if (requestedDate !== currentDate) {
     setSelectedDate_(context.controlSheet, requestedDate);
@@ -201,6 +214,12 @@ function handleDashboardData_(params) {
   }
 
   var tickerCodes = getTickerCodes_(context.controlSheet);
+  var snapshotPayload = loadDashboardSnapshot_(requestedDate, tickerCodes, false);
+  if (snapshotPayload) {
+    saveDashboardPayloadCache_(requestedDate, tickerCodes, snapshotPayload);
+    return snapshotPayload;
+  }
+
   var cachedPayload = loadDashboardPayloadCache_(requestedDate, tickerCodes);
   if (cachedPayload) {
     return cachedPayload;
@@ -208,7 +227,26 @@ function handleDashboardData_(params) {
 
   var payload = buildStableDashboardPayload_(context);
   saveDashboardPayloadCache_(payload.selectedDate || requestedDate, tickerCodes, payload);
+  saveDashboardSnapshot_(payload.selectedDate || requestedDate, tickerCodes, payload, 'request');
   return payload;
+}
+
+function handleDashboardSnapshotStatus_(params) {
+  var context = openDashboardContext_();
+  var dateIso = params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet);
+  var tickerCodes = getTickerCodes_(context.controlSheet);
+  var snapshot = loadDashboardSnapshot_(dateIso, tickerCodes, true);
+
+  return {
+    ok: true,
+    selectedDate: dateIso,
+    tickers: tickerCodes,
+    hasSnapshot: Boolean(snapshot),
+    snapshotUpdatedAt: snapshot ? snapshot.snapshotUpdatedAt : null,
+    snapshotAgeSeconds: snapshot ? snapshot.snapshotAgeSeconds : null,
+    snapshotSource: snapshot ? snapshot.snapshotSource : null,
+    snapshotFresh: snapshot ? isDashboardSnapshotFresh_(snapshot, dateIso) : false
+  };
 }
 
 function handleUpdateTickers_(params) {
@@ -222,6 +260,7 @@ function handleUpdateTickers_(params) {
 
   setTickerCodes_(context.controlSheet, resolvedCodes);
   clearDashboardPayloadCache_(requestedDate, resolvedCodes);
+  clearLatestDashboardSnapshot_();
 
   if (requestedDate !== getSelectedDateIso_(context.controlSheet)) {
     setSelectedDate_(context.controlSheet, requestedDate);
@@ -231,6 +270,7 @@ function handleUpdateTickers_(params) {
     waitForDashboardRefresh_(context, requestedDate, resolvedCodes);
     var payload = buildStableDashboardPayload_(context);
     saveDashboardPayloadCache_(payload.selectedDate || requestedDate, resolvedCodes, payload);
+    saveDashboardSnapshot_(payload.selectedDate || requestedDate, resolvedCodes, payload, 'update-tickers');
     return payload;
   }
 
@@ -260,6 +300,18 @@ function getDashboardPayloadCacheKey_(dateIso, codes) {
   ].join(':');
 }
 
+function getDashboardSnapshotCacheKey_(dateIso, codes) {
+  return [
+    'dashboard-snapshot',
+    coerceIsoDate_(dateIso),
+    normalizeDashboardCacheCodes_(codes).join(',')
+  ].join(':');
+}
+
+function getLatestDashboardSnapshotCacheKey_() {
+  return 'dashboard-snapshot:latest';
+}
+
 function getDashboardCacheTtlSeconds_(dateIso) {
   if (coerceIsoDate_(dateIso) === todayIsoKst_()) {
     return Math.max(60, Number(getSetting_(
@@ -272,6 +324,23 @@ function getDashboardCacheTtlSeconds_(dateIso) {
     'DASHBOARD_CACHE_MINUTES',
     PP_SHEET_GATEWAY.dashboardCacheMinutes
   )) || 360) * 60);
+}
+
+function getDashboardSnapshotTtlSeconds_() {
+  return Math.max(60, Math.round(Number(getSetting_(
+    'DASHBOARD_SNAPSHOT_CACHE_HOURS',
+    PP_SHEET_GATEWAY.dashboardSnapshotCacheHours
+  )) || 6) * 60 * 60);
+}
+
+function getDashboardSnapshotMaxAgeSeconds_(dateIso) {
+  if (coerceIsoDate_(dateIso) !== todayIsoKst_()) {
+    return getDashboardSnapshotTtlSeconds_();
+  }
+  return Math.max(60, Number(getSetting_(
+    'DASHBOARD_SNAPSHOT_MAX_AGE_SECONDS',
+    PP_SHEET_GATEWAY.dashboardSnapshotMaxAgeSeconds
+  )) || 300);
 }
 
 function loadDashboardPayloadCache_(dateIso, codes) {
@@ -295,6 +364,207 @@ function saveDashboardPayloadCache_(dateIso, codes, payload) {
 
 function clearDashboardPayloadCache_(dateIso, codes) {
   clearTransientCachedValue_(getDashboardPayloadCacheKey_(dateIso, codes));
+}
+
+function getPayloadUpdatedAtMs_(payload) {
+  var timestamp = String(
+    payload && (payload.snapshotUpdatedAt || payload.updatedAt || '')
+  ).trim();
+  if (!timestamp) return 0;
+
+  var parsed = new Date(timestamp).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function decorateDashboardSnapshot_(payload, source) {
+  var updatedAt = String(payload.snapshotUpdatedAt || payload.updatedAt || formatKstTimestamp_(new Date())).trim();
+  payload.snapshotUpdatedAt = updatedAt;
+  payload.snapshotAgeSeconds = getPayloadUpdatedAtMs_(payload)
+    ? Math.max(0, Math.round((Date.now() - getPayloadUpdatedAtMs_(payload)) / 1000))
+    : null;
+  payload.snapshotSource = source || payload.snapshotSource || 'snapshot';
+  return payload;
+}
+
+function isDashboardSnapshotFresh_(payload, dateIso) {
+  var updatedAtMs = getPayloadUpdatedAtMs_(payload);
+  if (!updatedAtMs) return false;
+  var ageSeconds = Math.max(0, Math.round((Date.now() - updatedAtMs) / 1000));
+  return ageSeconds <= getDashboardSnapshotMaxAgeSeconds_(dateIso);
+}
+
+function loadDashboardSnapshot_(dateIso, codes, allowStale) {
+  var snapshot = loadTransientCachedValue_(getDashboardSnapshotCacheKey_(dateIso, codes));
+  if (!snapshot || !snapshot.ok || !Array.isArray(snapshot.rows) || !Array.isArray(snapshot.slots)) {
+    return null;
+  }
+
+  snapshot = decorateDashboardSnapshot_(snapshot, snapshot.snapshotSource || 'snapshot');
+  if (!allowStale && !isDashboardSnapshotFresh_(snapshot, dateIso)) {
+    return null;
+  }
+
+  return snapshot;
+}
+
+function loadLatestDashboardSnapshot_(dateIso, allowStale) {
+  var snapshot = loadTransientCachedValue_(getLatestDashboardSnapshotCacheKey_());
+  if (!snapshot || !snapshot.ok || !Array.isArray(snapshot.rows) || !Array.isArray(snapshot.slots)) {
+    return null;
+  }
+
+  if (dateIso && snapshot.selectedDate !== dateIso) {
+    return null;
+  }
+
+  snapshot = decorateDashboardSnapshot_(snapshot, snapshot.snapshotSource || 'snapshot');
+  if (!allowStale && !isDashboardSnapshotFresh_(snapshot, snapshot.selectedDate || dateIso || todayIsoKst_())) {
+    return null;
+  }
+
+  return snapshot;
+}
+
+function saveDashboardSnapshot_(dateIso, codes, payload, source) {
+  if (!payload || !payload.ok || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) {
+    return;
+  }
+
+  var snapshot = decorateDashboardSnapshot_(payload, source || 'snapshot');
+  saveTransientCachedValueSeconds_(
+    getDashboardSnapshotCacheKey_(dateIso, codes),
+    snapshot,
+    getDashboardSnapshotTtlSeconds_()
+  );
+  saveTransientCachedValueSeconds_(
+    getLatestDashboardSnapshotCacheKey_(),
+    snapshot,
+    getDashboardSnapshotTtlSeconds_()
+  );
+}
+
+function clearLatestDashboardSnapshot_() {
+  clearTransientCachedValue_(getLatestDashboardSnapshotCacheKey_());
+}
+
+function shouldRunDashboardSnapshotTrigger_() {
+  var now = new Date();
+  var weekday = Number(Utilities.formatDate(now, PP_SHEET_GATEWAY.timezone, 'u'));
+  if (weekday === 6 || weekday === 7) {
+    return false;
+  }
+
+  var hour = Number(Utilities.formatDate(now, PP_SHEET_GATEWAY.timezone, 'H'));
+  var minute = Number(Utilities.formatDate(now, PP_SHEET_GATEWAY.timezone, 'm'));
+  var currentMinute = (hour * 60) + minute;
+  var openMinute = Number(getSetting_(
+    'DASHBOARD_SNAPSHOT_MARKET_OPEN_MINUTE',
+    PP_SHEET_GATEWAY.dashboardSnapshotMarketOpenMinute
+  ));
+  var closeMinute = Number(getSetting_(
+    'DASHBOARD_SNAPSHOT_MARKET_CLOSE_MINUTE',
+    PP_SHEET_GATEWAY.dashboardSnapshotMarketCloseMinute
+  ));
+
+  return currentMinute >= openMinute && currentMinute <= closeMinute;
+}
+
+function refreshDashboardSnapshot_(force) {
+  if (!force && !shouldRunDashboardSnapshotTrigger_()) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: 'outside-market-window',
+      now: formatKstTimestamp_(new Date())
+    };
+  }
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: 'snapshot-refresh-already-running',
+      now: formatKstTimestamp_(new Date())
+    };
+  }
+
+  try {
+    var context = openDashboardContext_();
+    var dateIso = getSelectedDateIso_(context.controlSheet);
+    var tickerCodes = getTickerCodes_(context.controlSheet);
+    var payload = buildStableDashboardPayload_(context);
+    saveDashboardPayloadCache_(payload.selectedDate || dateIso, tickerCodes, payload);
+    saveDashboardSnapshot_(payload.selectedDate || dateIso, tickerCodes, payload, force ? 'manual' : 'trigger');
+
+    return {
+      ok: true,
+      selectedDate: payload.selectedDate || dateIso,
+      tickers: tickerCodes,
+      rows: Array.isArray(payload.rows) ? payload.rows.length : 0,
+      slots: Array.isArray(payload.slots) ? payload.slots.length : 0,
+      snapshotUpdatedAt: payload.snapshotUpdatedAt || payload.updatedAt,
+      snapshotSource: force ? 'manual' : 'trigger'
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function refreshDashboardSnapshot() {
+  return refreshDashboardSnapshot_(true);
+}
+
+function refreshLiveDashboardSnapshot() {
+  return refreshDashboardSnapshot_(false);
+}
+
+function normalizeDashboardSnapshotTriggerMinutes_(value) {
+  var requested = Number(value);
+  var allowed = [1, 5, 10, 15, 30];
+  for (var i = 0; i < allowed.length; i += 1) {
+    if (requested === allowed[i]) {
+      return requested;
+    }
+  }
+  return 1;
+}
+
+function installDashboardSnapshotTrigger() {
+  removeDashboardSnapshotTrigger();
+  var minutes = normalizeDashboardSnapshotTriggerMinutes_(getSetting_(
+    'DASHBOARD_SNAPSHOT_TRIGGER_MINUTES',
+    PP_SHEET_GATEWAY.dashboardSnapshotTriggerMinutes
+  ));
+
+  ScriptApp.newTrigger('refreshLiveDashboardSnapshot')
+    .timeBased()
+    .everyMinutes(minutes)
+    .create();
+
+  return {
+    ok: true,
+    installed: true,
+    handler: 'refreshLiveDashboardSnapshot',
+    everyMinutes: minutes,
+    initialSnapshot: refreshDashboardSnapshot()
+  };
+}
+
+function removeDashboardSnapshotTrigger() {
+  var removed = 0;
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i += 1) {
+    if (triggers[i].getHandlerFunction() === 'refreshLiveDashboardSnapshot') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      removed += 1;
+    }
+  }
+
+  return {
+    ok: true,
+    removed: removed
+  };
 }
 
 function openDashboardContext_() {

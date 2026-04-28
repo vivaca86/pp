@@ -28,3 +28,10 @@ GET 액션:
 3. `Execute as: Me`
 4. `Who has access: Anyone`
 5. 생성된 `/exec` URL을 프런트 `config.js`에 반영
+
+스냅샷 트리거:
+
+- 배포 후 Apps Script 편집기에서 `installDashboardSnapshotTrigger()`를 한 번 실행하면 장중 1분 간격으로 현재 월간표 스냅샷을 미리 저장합니다.
+- 즉시 스냅샷을 갱신하려면 `refreshDashboardSnapshot()`을 실행합니다.
+- 트리거를 제거하려면 `removeDashboardSnapshotTrigger()`을 실행합니다.
+- 웹앱에서 `action=dashboard-snapshot-status`로 현재 스냅샷 상태를 확인할 수 있습니다.
