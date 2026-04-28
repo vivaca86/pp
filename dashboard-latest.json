@@ -73,9 +73,10 @@
       "id": 6,
       "editable": true,
       "code": "000660",
-      "name": "000660",
-      "market": "KRX",
-      "total": 0.61951925
+      "name": "SK하이닉스",
+      "market": "KOSPI",
+      "total": 0.61951925,
+      "assetType": "stock"
     }
   ],
   "rows": [
@@ -842,10 +843,10 @@
   ],
   "updatedAt": "2026-04-28T20:50:32+09:00",
   "snapshotUpdatedAt": "2026-04-28T20:50:32+09:00",
-  "snapshotAgeSeconds": 97,
+  "snapshotAgeSeconds": 198,
   "snapshotSource": "request",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-04-28T11:52:10.054Z",
+  "staticPublishedAt": "2026-04-28T11:53:50.629Z",
   "staticGenerator": "github-actions"
 }
