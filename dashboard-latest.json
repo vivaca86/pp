@@ -4,11 +4,11 @@
   "spreadsheetTitle": "주식",
   "selectedDate": "2026-04-28",
   "selectedDateLabel": "2026.04.28",
-  "selectedDateIsTradingDay": false,
+  "selectedDateIsTradingDay": true,
   "today": "2026-04-28",
-  "lastTradingDate": "2026-04-27",
-  "lastTradingDateLabel": "2026.04.27",
-  "tradingDateCount": 19,
+  "lastTradingDate": "2026-04-28",
+  "lastTradingDateLabel": "2026.04.28",
+  "tradingDateCount": 20,
   "slots": [
     {
       "editable": false,
@@ -72,14 +72,51 @@
     {
       "id": 6,
       "editable": true,
-      "code": "005930",
-      "name": "삼성전자",
-      "market": "KOSPI",
-      "total": 0.34975691,
-      "assetType": "stock"
+      "code": "000660",
+      "name": "000660",
+      "market": "KRX",
+      "total": 0.61951925
     }
   ],
   "rows": [
+    {
+      "date": "2026-04-28",
+      "displayDate": "04-28",
+      "values": [
+        {
+          "value": 0.00392893,
+          "display": "0.39%"
+        },
+        {
+          "value": 0,
+          "display": "0.00%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.02214022,
+          "display": "-2.21%"
+        },
+        {
+          "value": -0.01740295,
+          "display": "-1.74%"
+        },
+        {
+          "value": 0.01630435,
+          "display": "1.63%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.00619195,
+          "display": "0.62%"
+        }
+      ]
+    },
     {
       "date": "2026-04-27",
       "displayDate": "04-27",
@@ -113,8 +150,8 @@
           "display": "-"
         },
         {
-          "value": 0.02277904,
-          "display": "2.28%"
+          "value": 0.05728314,
+          "display": "5.73%"
         }
       ]
     },
@@ -151,8 +188,8 @@
           "display": "-"
         },
         {
-          "value": -0.02227171,
-          "display": "-2.23%"
+          "value": -0.00244898,
+          "display": "-0.24%"
         }
       ]
     },
@@ -189,8 +226,8 @@
           "display": "-"
         },
         {
-          "value": 0.03218391,
-          "display": "3.22%"
+          "value": 0.00163532,
+          "display": "0.16%"
         }
       ]
     },
@@ -227,8 +264,8 @@
           "display": "-"
         },
         {
-          "value": -0.00684932,
-          "display": "-0.68%"
+          "value": -0.00081699,
+          "display": "-0.08%"
         }
       ]
     },
@@ -265,8 +302,8 @@
           "display": "-"
         },
         {
-          "value": 0.02097902,
-          "display": "2.10%"
+          "value": 0.04974271,
+          "display": "4.97%"
         }
       ]
     },
@@ -303,8 +340,8 @@
           "display": "-"
         },
         {
-          "value": -0.00694444,
-          "display": "-0.69%"
+          "value": 0.03368794,
+          "display": "3.37%"
         }
       ]
     },
@@ -341,8 +378,8 @@
           "display": "-"
         },
         {
-          "value": -0.00689655,
-          "display": "-0.69%"
+          "value": -0.02337662,
+          "display": "-2.34%"
         }
       ]
     },
@@ -379,8 +416,8 @@
           "display": "-"
         },
         {
-          "value": 0.03080569,
-          "display": "3.08%"
+          "value": 0.01672535,
+          "display": "1.67%"
         }
       ]
     },
@@ -417,8 +454,8 @@
           "display": "-"
         },
         {
-          "value": 0.02179177,
-          "display": "2.18%"
+          "value": 0.0299184,
+          "display": "2.99%"
         }
       ]
     },
@@ -455,8 +492,8 @@
           "display": "-"
         },
         {
-          "value": 0.02736318,
-          "display": "2.74%"
+          "value": 0.06057692,
+          "display": "6.06%"
         }
       ]
     },
@@ -493,8 +530,8 @@
           "display": "-"
         },
         {
-          "value": -0.02427184,
-          "display": "-2.43%"
+          "value": 0.01265823,
+          "display": "1.27%"
         }
       ]
     },
@@ -531,8 +568,8 @@
           "display": "-"
         },
         {
-          "value": 0.00980392,
-          "display": "0.98%"
+          "value": 0.02905812,
+          "display": "2.91%"
         }
       ]
     },
@@ -569,8 +606,8 @@
           "display": "-"
         },
         {
-          "value": -0.03087886,
-          "display": "-3.09%"
+          "value": -0.0338819,
+          "display": "-3.39%"
         }
       ]
     },
@@ -607,8 +644,8 @@
           "display": "-"
         },
         {
-          "value": 0.07124682,
-          "display": "7.12%"
+          "value": 0.12772926,
+          "display": "12.77%"
         }
       ]
     },
@@ -645,8 +682,8 @@
           "display": "-"
         },
         {
-          "value": 0.01760746,
-          "display": "1.76%"
+          "value": 0.03386005,
+          "display": "3.39%"
         }
       ]
     },
@@ -683,8 +720,8 @@
           "display": "-"
         },
         {
-          "value": 0.03705693,
-          "display": "3.71%"
+          "value": 0.01141553,
+          "display": "1.14%"
         }
       ]
     },
@@ -721,8 +758,8 @@
           "display": "-"
         },
         {
-          "value": 0.04372197,
-          "display": "4.37%"
+          "value": 0.05542169,
+          "display": "5.54%"
         }
       ]
     },
@@ -759,8 +796,8 @@
           "display": "-"
         },
         {
-          "value": -0.0593198,
-          "display": "-5.93%"
+          "value": -0.07469342,
+          "display": "-7.47%"
         }
       ]
     },
@@ -797,18 +834,18 @@
           "display": "-"
         },
         {
-          "value": 0.13427033,
-          "display": "13.43%"
+          "value": 0.11152416,
+          "display": "11.15%"
         }
       ]
     }
   ],
-  "updatedAt": "2026-04-28T18:24:00+09:00",
-  "snapshotUpdatedAt": "2026-04-28T18:24:00+09:00",
-  "snapshotAgeSeconds": 4978,
-  "snapshotSource": "manual",
+  "updatedAt": "2026-04-28T20:50:32+09:00",
+  "snapshotUpdatedAt": "2026-04-28T20:50:32+09:00",
+  "snapshotAgeSeconds": 97,
+  "snapshotSource": "request",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-04-28T10:46:59.362Z",
+  "staticPublishedAt": "2026-04-28T11:52:10.054Z",
   "staticGenerator": "github-actions"
 }
