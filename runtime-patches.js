@@ -180,7 +180,7 @@
 
         if (typeof loadDashboardPayloadWithRetry === "function") {
           loadDashboardPayloadWithRetry = async function (date, maxAttempts = 3) {
-            if (!state.dashboard) {
+            if (!state.dashboard || state.dashboardFromCache) {
               return loadDashboardPayloadFromSheetWithRetry(date, Math.min(maxAttempts, 2));
             }
 
@@ -201,6 +201,9 @@
             const nextEditableSlots = buildEditableSlotsFromCodes(codes);
 
             state.editableSlots = nextEditableSlots;
+            if (typeof clearCachedDashboardPayload === "function") {
+              clearCachedDashboardPayload();
+            }
 
             try {
               try {

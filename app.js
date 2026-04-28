@@ -3,6 +3,8 @@ const SLOT_COUNT = 6;
 const STORAGE_LAST_DATE = "stock_lab_selected_date";
 const STORAGE_ACTIVE_VIEW = "stock_lab_active_view";
 const STORAGE_DASHBOARD_SOURCE_MODE = "stock_lab_dashboard_source_mode";
+const STORAGE_DASHBOARD_PAYLOAD = "stock_lab_dashboard_payload_v1";
+const DASHBOARD_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const RECOMMENDATION_GATEWAY_COOLDOWN_MS = 8000;
 const RECOMMENDATION_RUN_COOLDOWN_MS = 12000;
 const RECOMMENDATION_WARMUP_MAX_PERIOD_MONTHS = 12;
@@ -31,6 +33,7 @@ const recommendationWarmupState = {
   pending: new Map()
 };
 let recommendationCooldownTimer = 0;
+let catalogLoadStarted = false;
 
 const KOSPI_BENCHMARK = {
   code: "0001",
@@ -94,6 +97,7 @@ const state = {
   dataMode: "demo",
   session: "historical",
   dashboard: null,
+  dashboardFromCache: false,
   activeView: "dashboard",
   lastDashboardLoadedAt: 0,
   mobileSlideIndex: 0,
@@ -308,7 +312,9 @@ function getSessionLabel(session) {
 }
 
 function normalizeViewName(view) {
-  return view === "recommendations" ? "recommendations" : "dashboard";
+  const normalized = String(view || "").trim().toLowerCase();
+  if (normalized === "recommendations" || normalized === "calculator") return normalized;
+  return "dashboard";
 }
 
 function normalizeRecommendationUniverseClient(value) {
@@ -324,7 +330,7 @@ function renderActiveView() {
     section.hidden = section.dataset.viewPage !== activeView;
   });
 
-  [elements.dashboardViewButton, elements.recommendationViewButton, ...elements.mobileViewButtons].forEach((button) => {
+  document.querySelectorAll(".view-switcher-button[data-view], .mobile-bottom-nav-button[data-view]").forEach((button) => {
     if (!button) return;
     const isActive = button.dataset.view === activeView;
     button.classList.toggle("is-active", isActive);
@@ -769,6 +775,50 @@ function buildRequestUrl(params) {
   return url.toString();
 }
 
+function readCachedDashboardPayload(date) {
+  try {
+    const record = JSON.parse(localStorage.getItem(STORAGE_DASHBOARD_PAYLOAD) || "null");
+    const payload = record?.payload;
+    const savedAt = Number(record?.savedAt || 0);
+    if (!payload || payload.selectedDate !== date) return null;
+    if (!savedAt || (Date.now() - savedAt) > DASHBOARD_CACHE_MAX_AGE_MS) return null;
+    return payload;
+  } catch (error) {
+    console.warn("dashboard cache read failed", error);
+    return null;
+  }
+}
+
+function saveCachedDashboardPayload(payload) {
+  if (!payload?.selectedDate || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) return;
+
+  try {
+    localStorage.setItem(STORAGE_DASHBOARD_PAYLOAD, JSON.stringify({
+      savedAt: Date.now(),
+      payload
+    }));
+  } catch (error) {
+    console.warn("dashboard cache save failed", error);
+  }
+}
+
+function clearCachedDashboardPayload() {
+  try {
+    localStorage.removeItem(STORAGE_DASHBOARD_PAYLOAD);
+  } catch (error) {
+    console.warn("dashboard cache clear failed", error);
+  }
+}
+
+function renderCachedDashboardIfAvailable(date) {
+  const cachedPayload = readCachedDashboardPayload(date);
+  if (!cachedPayload) return false;
+
+  renderDashboard(cachedPayload, { cache: false, fromCache: true });
+  setStatus("저장된 월간표를 먼저 표시했습니다. 최신 데이터를 확인하는 중...", "loading");
+  return true;
+}
+
 function getSeriesCacheKey(target, selectedDate) {
   if (!target?.code) return "";
   return `${target.assetType}:${target.code}:${selectedDate}`;
@@ -790,6 +840,16 @@ async function loadCatalog() {
   }
 
   buildTickerDatalist();
+}
+
+function scheduleCatalogLoad() {
+  if (catalogLoadStarted) return;
+  catalogLoadStarted = true;
+  window.setTimeout(() => {
+    loadCatalog().catch((error) => {
+      console.warn("catalog background load", error);
+    });
+  }, 0);
 }
 
 function findCatalogItem(rawValue) {
@@ -962,6 +1022,7 @@ function attachSlotEvents() {
 async function saveTickerCodes(codes) {
   const targetDate = elements.dateInput.value || state.selectedDate || getTodayKstDate();
   const requestedCodes = codes.map((code) => normalizeTicker(code));
+  clearCachedDashboardPayload();
   await requestGateway({
     action: "update-tickers",
     tickers: codes.join(","),
@@ -1413,8 +1474,9 @@ function renderMobileCompare(payload) {
   });
 }
 
-function renderDashboard(payload) {
+function renderDashboard(payload, options = {}) {
   state.dashboard = payload;
+  state.dashboardFromCache = Boolean(options.fromCache);
   state.selectedDate = payload.selectedDate || state.selectedDate;
   state.dataMode = payload.sourceMode || "gateway";
   state.session = payload.session || "linked";
@@ -1427,6 +1489,10 @@ function renderDashboard(payload) {
   renderSlots(payload.slots);
   renderTable(payload);
   renderMobileCompare(payload);
+
+  if (options.cache !== false) {
+    saveCachedDashboardPayload(payload);
+  }
 }
 
 function bindEvents() {
@@ -1449,8 +1515,9 @@ function bindEvents() {
   [elements.dashboardViewButton, elements.recommendationViewButton, ...elements.mobileViewButtons].forEach((button) => {
     if (!button) return;
     button.addEventListener("click", () => {
-      setActiveView(button.dataset.view || "dashboard");
-      if ((button.dataset.view || "dashboard") === "dashboard" && !state.dashboard && !state.loading) {
+      const nextView = normalizeViewName(button.dataset.view || "dashboard");
+      setActiveView(nextView);
+      if ((nextView === "dashboard" || nextView === "recommendations") && !state.dashboard && !state.loading) {
         loadDashboard(state.selectedDate || elements.dateInput.value || getTodayKstDate()).catch((error) => {
           console.error(error);
           setStatus(error.message, "error");
@@ -2013,7 +2080,7 @@ async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
   }
 }
 
-async function loadDashboard(date = getTodayKstDate()) {
+async function loadDashboard(date = getTodayKstDate(), options = {}) {
   const previousDate = state.selectedDate;
   if (previousDate && previousDate !== date) {
     setRecommendationState({
@@ -2025,15 +2092,19 @@ async function loadDashboard(date = getTodayKstDate()) {
 
   state.selectedDate = date;
   localStorage.setItem(STORAGE_LAST_DATE, date);
+  const renderedCachedPayload = options.useCache !== false && renderCachedDashboardIfAvailable(date);
   state.loading = true;
   setBusyState(true);
-  setStatus("월간표를 불러오는 중...", "loading");
+  if (!renderedCachedPayload) {
+    setStatus("월간표를 불러오는 중...", "loading");
+  }
 
   try {
     const payload = await loadDashboardPayloadWithRetry(date);
     renderDashboard(payload);
     state.lastDashboardLoadedAt = Date.now();
     warmRecommendationUniverse(state.recommendations.filters, { silent: true }).catch(() => {});
+    scheduleCatalogLoad();
     setStatus("업데이트 완료", "success");
   } catch (error) {
     console.error(error);
@@ -2174,12 +2245,12 @@ async function bootstrap() {
   buildTickerDatalist();
 
   try {
+    if (state.activeView === "calculator") {
+      setStatus("계산기 준비 완료", "success");
+      return;
+    }
+
     await loadDashboard(state.selectedDate);
-    window.setTimeout(() => {
-      loadCatalog().catch((error) => {
-        console.warn("catalog background load", error);
-      });
-    }, 0);
   } catch (error) {
     console.error(error);
     setStatus(error, "error");

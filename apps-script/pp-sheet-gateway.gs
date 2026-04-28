@@ -96,7 +96,9 @@ var PP_SHEET_GATEWAY = {
   indexDateRangeA1: 'B3:B80',
   holidayCalendarUrl: 'https://calendar.google.com/calendar/ical/ko.south_korea%23holiday%40group.v.calendar.google.com/public/basic.ics',
   recalcAttempts: 14,
-  recalcPauseMs: 1200
+  recalcPauseMs: 1200,
+  dashboardCacheMinutes: 360,
+  dashboardTodayCacheSeconds: 60
 };
 
 function doGet(e) {
@@ -198,7 +200,15 @@ function handleDashboardData_(params) {
     waitForDashboardRefresh_(context, requestedDate, null);
   }
 
-  return buildStableDashboardPayload_(context);
+  var tickerCodes = getTickerCodes_(context.controlSheet);
+  var cachedPayload = loadDashboardPayloadCache_(requestedDate, tickerCodes);
+  if (cachedPayload) {
+    return cachedPayload;
+  }
+
+  var payload = buildStableDashboardPayload_(context);
+  saveDashboardPayloadCache_(payload.selectedDate || requestedDate, tickerCodes, payload);
+  return payload;
 }
 
 function handleUpdateTickers_(params) {
@@ -211,6 +221,7 @@ function handleUpdateTickers_(params) {
   });
 
   setTickerCodes_(context.controlSheet, resolvedCodes);
+  clearDashboardPayloadCache_(requestedDate, resolvedCodes);
 
   if (requestedDate !== getSelectedDateIso_(context.controlSheet)) {
     setSelectedDate_(context.controlSheet, requestedDate);
@@ -218,7 +229,9 @@ function handleUpdateTickers_(params) {
 
   if (waitForStablePayload) {
     waitForDashboardRefresh_(context, requestedDate, resolvedCodes);
-    return buildStableDashboardPayload_(context);
+    var payload = buildStableDashboardPayload_(context);
+    saveDashboardPayloadCache_(payload.selectedDate || requestedDate, resolvedCodes, payload);
+    return payload;
   }
 
   return {
@@ -229,6 +242,59 @@ function handleUpdateTickers_(params) {
     tickers: resolvedCodes,
     note: '티커 저장을 접수했습니다. 월간표는 백그라운드에서 갱신됩니다.'
   };
+}
+
+function normalizeDashboardCacheCodes_(codes) {
+  var normalized = Array.isArray(codes) ? codes.slice() : [];
+  while (normalized.length < PP_SHEET_GATEWAY.editableTickerCount) {
+    normalized.push('');
+  }
+  return normalized.slice(0, PP_SHEET_GATEWAY.editableTickerCount).map(sanitizeStockCode_);
+}
+
+function getDashboardPayloadCacheKey_(dateIso, codes) {
+  return [
+    'dashboard-data',
+    coerceIsoDate_(dateIso),
+    normalizeDashboardCacheCodes_(codes).join(',')
+  ].join(':');
+}
+
+function getDashboardCacheTtlSeconds_(dateIso) {
+  if (coerceIsoDate_(dateIso) === todayIsoKst_()) {
+    return Math.max(60, Number(getSetting_(
+      'DASHBOARD_TODAY_CACHE_SECONDS',
+      PP_SHEET_GATEWAY.dashboardTodayCacheSeconds
+    )) || 60);
+  }
+
+  return Math.max(60, Math.round(Number(getSetting_(
+    'DASHBOARD_CACHE_MINUTES',
+    PP_SHEET_GATEWAY.dashboardCacheMinutes
+  )) || 360) * 60);
+}
+
+function loadDashboardPayloadCache_(dateIso, codes) {
+  var cached = loadTransientCachedValue_(getDashboardPayloadCacheKey_(dateIso, codes));
+  if (!cached || !cached.ok || !Array.isArray(cached.rows) || !Array.isArray(cached.slots)) {
+    return null;
+  }
+  return cached;
+}
+
+function saveDashboardPayloadCache_(dateIso, codes, payload) {
+  if (!payload || !payload.ok || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) {
+    return;
+  }
+  saveTransientCachedValueSeconds_(
+    getDashboardPayloadCacheKey_(dateIso, codes),
+    payload,
+    getDashboardCacheTtlSeconds_(dateIso)
+  );
+}
+
+function clearDashboardPayloadCache_(dateIso, codes) {
+  clearTransientCachedValue_(getDashboardPayloadCacheKey_(dateIso, codes));
 }
 
 function openDashboardContext_() {
@@ -2285,9 +2351,17 @@ function loadTransientCachedValue_(suffix) {
   return safeJsonParse_(cachedText);
 }
 
+function saveTransientCachedValueSeconds_(suffix, value, ttlSeconds) {
+  var normalizedTtlSeconds = Math.max(60, Math.min(21600, Math.round(Number(ttlSeconds || 60))));
+  CacheService.getScriptCache().put(cacheKey_(suffix), JSON.stringify(value), normalizedTtlSeconds);
+}
+
 function saveTransientCachedValue_(suffix, value, ttlHours) {
-  var ttlSeconds = Math.max(60, Math.min(21600, Math.round(Number(ttlHours || 1) * 60 * 60)));
-  CacheService.getScriptCache().put(cacheKey_(suffix), JSON.stringify(value), ttlSeconds);
+  saveTransientCachedValueSeconds_(suffix, value, Number(ttlHours || 1) * 60 * 60);
+}
+
+function clearTransientCachedValue_(suffix) {
+  CacheService.getScriptCache().remove(cacheKey_(suffix));
 }
 
 function saveCachedValue_(suffix, value, ttlHours) {
