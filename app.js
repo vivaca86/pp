@@ -78,6 +78,17 @@ const LOCAL_STOCK_CATALOG = [
   { code: "039030", name: "이오테크닉스", market: "KOSDAQ", assetType: "stock" }
 ];
 
+const QUICK_STOCK_CATALOG = [
+  { code: "0183V0", name: "KIWOOM 삼성전자&SK하이닉스채권혼합50", market: "KOSPI", assetType: "etf" },
+  { code: "213420", name: "덕산네오룩스", market: "KOSDAQ", assetType: "stock" },
+  { code: "042700", name: "한미반도체", market: "KOSPI", assetType: "stock" },
+  { code: "319660", name: "피에스케이", market: "KOSDAQ", assetType: "stock" },
+  { code: "Q530095", name: "삼성 구리 선물 ETN(H)", market: "KOSPI", assetType: "etn" },
+  { code: "005930", name: "삼성전자", market: "KOSPI", assetType: "stock" }
+];
+
+LOCAL_STOCK_CATALOG.push(...QUICK_STOCK_CATALOG);
+
 const DEFAULT_SLOT_CODES = ["", "", "", "", "", ""];
 
 const DEMO_SERIES = {
@@ -811,11 +822,14 @@ function ensureGatewayCard() {
 function enrichStockMeta(stock) {
   if (!stock) return null;
   const code = normalizeTicker(stock.code);
-  const fallback = LOCAL_STOCK_CATALOG.find((item) => item.code === code) || {};
+  const fallback = LOCAL_STOCK_CATALOG.find((item) => normalizeTicker(item.code) === code) || {};
+  const rawName = String(stock.name || "").trim();
+  const fallbackName = String(fallback.name || "").trim();
+  const nameLooksLikeCode = rawName && normalizeTicker(rawName) === code;
   return {
     code,
-    name: String(stock.name || fallback.name || code).trim(),
-    market: String(stock.market || fallback.market || "KOSPI").trim().toUpperCase(),
+    name: nameLooksLikeCode ? (fallbackName || rawName) : (rawName || fallbackName || code),
+    market: String((stock.market && stock.market !== "KRX" ? stock.market : fallback.market) || stock.market || "KOSPI").trim().toUpperCase(),
     assetType: String(stock.assetType || fallback.assetType || "stock").trim()
   };
 }
@@ -929,6 +943,38 @@ function scheduleCatalogLoad() {
       console.warn("catalog background load", error);
     });
   }, 0);
+}
+
+function isStaticDashboardPayload(payload) {
+  const sourceMode = String(payload?.sourceMode || "").trim().toLowerCase();
+  return Boolean(
+    payload?.staticSnapshot
+    || payload?.edgeSource
+    || sourceMode === "static-snapshot"
+    || sourceMode === "cloudflare-kv"
+  );
+}
+
+function enrichDashboardSlot(slot) {
+  if (!slot?.code) return slot;
+  const stock = enrichStockMeta(slot);
+  if (!stock) return slot;
+
+  return {
+    ...slot,
+    name: stock.name || slot.name,
+    market: stock.market || slot.market,
+    assetType: stock.assetType || slot.assetType,
+    stock
+  };
+}
+
+function enrichDashboardPayload(payload) {
+  if (!payload || !Array.isArray(payload.slots)) return payload;
+  return {
+    ...payload,
+    slots: payload.slots.map(enrichDashboardSlot)
+  };
 }
 
 function findCatalogItem(rawValue) {
@@ -1045,6 +1091,8 @@ function getSlotDisplayLabel(slot) {
   if (!slot) return "-";
   if (!slot.editable) return slot.name;
   if (slot.stock) return slot.stock.name;
+  if (slot.name && normalizeTicker(slot.name) !== normalizeTicker(slot.code)) return slot.name;
+  if (slot.code) return slot.code;
   return `종목${slot.id}`;
 }
 
@@ -1080,6 +1128,7 @@ function attachSlotEvents() {
     if (!input || input.dataset.editable !== "true") return;
 
     input.addEventListener("input", () => updateSlotPreview(card));
+    input.addEventListener("focus", () => scheduleCatalogLoad(), { once: true });
     input.addEventListener("change", () => {
       updateSlotPreview(card);
       saveTickers().catch((error) => {
@@ -1554,7 +1603,7 @@ function renderMobileCompare(payload) {
 }
 
 function renderDashboard(payload, options = {}) {
-  payload = normalizeDashboardPayloadAge(payload);
+  payload = enrichDashboardPayload(normalizeDashboardPayloadAge(payload));
   state.dashboard = payload;
   state.dashboardFromCache = Boolean(options.fromCache);
   state.selectedDate = payload.selectedDate || state.selectedDate;
@@ -2290,11 +2339,16 @@ async function loadDashboard(date = getTodayKstDate(), options = {}) {
 
   try {
     const payload = await loadDashboardPayloadWithRetry(date);
+    const staticPayload = isStaticDashboardPayload(payload);
     renderDashboard(payload);
     state.lastDashboardLoadedAt = Date.now();
-    warmRecommendationUniverse(state.recommendations.filters, { silent: true }).catch(() => {});
-    scheduleCatalogLoad();
-    loadSnapshotStatus(payload.selectedDate || date).catch(() => {});
+    if (state.activeView === "recommendations") {
+      warmRecommendationUniverse(state.recommendations.filters, { silent: true }).catch(() => {});
+    }
+    if (!staticPayload) {
+      scheduleCatalogLoad();
+      loadSnapshotStatus(payload.selectedDate || date).catch(() => {});
+    }
     setStatus("업데이트 완료", "success");
   } catch (error) {
     console.error(error);
@@ -2414,8 +2468,10 @@ function renderRecommendationResults() {
 
 function restoreState() {
   const today = getTodayKstDate();
-  state.selectedDate = localStorage.getItem(STORAGE_LAST_DATE) || today;
-  state.activeView = normalizeViewName(localStorage.getItem(STORAGE_ACTIVE_VIEW));
+  state.selectedDate = today;
+  state.activeView = "calculator";
+  localStorage.setItem(STORAGE_LAST_DATE, today);
+  localStorage.setItem(STORAGE_ACTIVE_VIEW, state.activeView);
   elements.dateInput.value = state.selectedDate;
   elements.dateInput.max = today;
   restoreEditableSlots();
@@ -2437,6 +2493,9 @@ async function bootstrap() {
   try {
     if (state.activeView === "calculator") {
       setStatus("계산기 준비 완료", "success");
+      loadDashboard(state.selectedDate).catch((error) => {
+        console.warn("dashboard preload failed", error);
+      });
       return;
     }
 

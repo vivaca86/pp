@@ -28,49 +28,55 @@
       "id": 1,
       "editable": true,
       "code": "0183V0",
-      "name": "0183V0",
-      "market": "KRX",
-      "total": 0
+      "name": "KIWOOM 삼성전자&SK하이닉스채권혼합50",
+      "market": "KOSPI",
+      "total": 0,
+      "assetType": "etf"
     },
     {
       "id": 2,
       "editable": true,
       "code": "213420",
-      "name": "213420",
-      "market": "KRX",
-      "total": 0.4113969
+      "name": "덕산네오룩스",
+      "market": "KOSDAQ",
+      "total": 0.4113969,
+      "assetType": "stock"
     },
     {
       "id": 3,
       "editable": true,
       "code": "042700",
-      "name": "042700",
-      "market": "KRX",
-      "total": 0.43132937
+      "name": "한미반도체",
+      "market": "KOSPI",
+      "total": 0.43132937,
+      "assetType": "stock"
     },
     {
       "id": 4,
       "editable": true,
       "code": "319660",
-      "name": "319660",
-      "market": "KRX",
-      "total": 0.05027269
+      "name": "피에스케이",
+      "market": "KOSDAQ",
+      "total": 0.05027269,
+      "assetType": "stock"
     },
     {
       "id": 5,
       "editable": true,
       "code": "Q530095",
-      "name": "Q530095",
-      "market": "KRX",
-      "total": 0
+      "name": "삼성 구리 선물 ETN(H)",
+      "market": "KOSPI",
+      "total": 0,
+      "assetType": "etn"
     },
     {
       "id": 6,
       "editable": true,
       "code": "005930",
-      "name": "005930",
-      "market": "KRX",
-      "total": 0.34975691
+      "name": "삼성전자",
+      "market": "KOSPI",
+      "total": 0.34975691,
+      "assetType": "stock"
     }
   ],
   "rows": [
@@ -799,10 +805,10 @@
   ],
   "updatedAt": "2026-04-28T18:24:00+09:00",
   "snapshotUpdatedAt": "2026-04-28T18:24:00+09:00",
-  "snapshotAgeSeconds": 621,
+  "snapshotAgeSeconds": 4978,
   "snapshotSource": "manual",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-04-28T09:34:22.224Z",
+  "staticPublishedAt": "2026-04-28T10:46:59.362Z",
   "staticGenerator": "github-actions"
 }
