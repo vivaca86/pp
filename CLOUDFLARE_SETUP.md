@@ -50,6 +50,18 @@ Workers KV Storage: Edit
 
 The scheduled `Dashboard Snapshot` GitHub Action will keep committing `dashboard-latest.json` as a fallback and will also upload the same JSON to KV when these secrets exist.
 
+Fast local setup:
+
+1. Open `.cloudflare-secrets.ps1`.
+2. Replace the three `PASTE_..._HERE` values.
+3. Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\set-cloudflare-github-secrets.ps1
+```
+
+The local `.cloudflare-secrets.ps1` file is ignored by Git and must not be committed.
+
 ## Flip The Frontend
 
 Once the Worker URL is confirmed, change `config.js`:
