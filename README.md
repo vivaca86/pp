@@ -1,5 +1,6 @@
 # PP Dashboard
 
+- Next work queue for future Codex sessions: [`NEXT_WORK.md`](./NEXT_WORK.md)
 - Quick guide: `C:\Users\vivac\OneDrive\문서\aa\pp\QUICK_GUIDE.md`
 
 구글 시트 `주식`을 반응형 웹 대시보드로 보여주는 프로젝트입니다.
