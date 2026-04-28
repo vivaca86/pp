@@ -631,14 +631,18 @@ function buildDashboardPayload_(context) {
   var selectedDate = getSelectedDateIso_(context.controlSheet);
   var today = todayIsoKst_();
   var selectedDateIsToday = selectedDate === today;
-  var selectedDateIsRedDay = isKoreanRedDay_(selectedDate);
-  var allowLiveSelectedDate = selectedDateIsToday && !selectedDateIsRedDay;
   var tradingDates = readTradingDates_(context.indexSheet);
   var tradingSet = {};
 
   for (var i = 0; i < tradingDates.length; i += 1) {
     tradingSet[tradingDates[i]] = true;
   }
+
+  var selectedDateIsWeekend = isWeekendIso_(selectedDate);
+  var selectedDateIsKnownTradingDay = Boolean(tradingSet[selectedDate]);
+  var allowLiveSelectedDate = selectedDateIsToday
+    && !selectedDateIsWeekend
+    && (!tradingDates.length || selectedDateIsKnownTradingDay);
 
   var slots = buildSlotPayloads_(values[0]);
   var totals = new Array(slots.length).fill(0);
@@ -2315,7 +2319,12 @@ function buildSheetDate_(dateIso) {
 function isKoreanRedDay_(dateIso) {
   if (!dateIso) return false;
   if (isWeekendIso_(dateIso)) return true;
-  return Boolean(getKoreanHolidaySet_()[dateIso]);
+  try {
+    return Boolean(getKoreanHolidaySet_()[dateIso]);
+  } catch (error) {
+    console.warn('holiday calendar fallback', error);
+    return false;
+  }
 }
 
 function getKoreanHolidaySet_() {
