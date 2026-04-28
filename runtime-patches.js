@@ -175,6 +175,9 @@
             document.querySelectorAll('.slot-input[data-editable="true"]').forEach((input) => {
               input.disabled = Boolean(state.saving);
             });
+            if (elements.snapshotRefreshButton) {
+              elements.snapshotRefreshButton.disabled = Boolean(state.snapshotRefreshing || state.loading || state.saving);
+            }
           };
         }
 

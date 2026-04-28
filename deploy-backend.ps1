@@ -1,5 +1,7 @@
 param(
-  [switch]$Login
+  [switch]$Login,
+  [string]$DeploymentId = "",
+  [string]$Description = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,4 +20,4 @@ if (Test-Path $npmGlobalBin) {
   $env:Path = "$npmGlobalBin;$env:Path"
 }
 
-& $scriptPath -Login:$Login
+& $scriptPath -Login:$Login -DeploymentId $DeploymentId -Description $Description

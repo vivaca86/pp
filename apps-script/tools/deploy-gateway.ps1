@@ -1,6 +1,8 @@
 param(
   [string]$Title = "pp-sheet-gateway",
-  [switch]$Login
+  [switch]$Login,
+  [string]$DeploymentId = "",
+  [string]$Description = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -89,6 +91,28 @@ function Ensure-ClaspProject {
   }
 }
 
+function Resolve-DeploymentId {
+  param(
+    [string]$RequestedDeploymentId,
+    [string]$ProjectDirectory
+  )
+
+  if (-not [string]::IsNullOrWhiteSpace($RequestedDeploymentId)) {
+    return $RequestedDeploymentId.Trim()
+  }
+
+  $configPath = Resolve-Path (Join-Path $ProjectDirectory "..\\config.js") -ErrorAction SilentlyContinue
+  if ($configPath) {
+    $configText = Get-Content -Raw -Encoding UTF8 $configPath.Path
+    $match = [regex]::Match($configText, "script\.google\.com/macros/s/([^/]+)/exec")
+    if ($match.Success) {
+      return $match.Groups[1].Value
+    }
+  }
+
+  return ""
+}
+
 Require-Command node
 Require-Command npm
 
@@ -113,15 +137,44 @@ $claspFile = Join-Path $projectDir ".clasp.json"
 $claspConfig = Get-Content -Raw -Encoding UTF8 $claspFile | ConvertFrom-Json
 $scriptId = [string]$claspConfig.scriptId
 $editorUrl = "https://script.google.com/d/$scriptId/edit"
+$resolvedDeploymentId = Resolve-DeploymentId -RequestedDeploymentId $DeploymentId -ProjectDirectory $projectDir
+$deployDescription = if ([string]::IsNullOrWhiteSpace($Description)) {
+  "Automated deploy $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+}
+else {
+  $Description
+}
+
+if (-not [string]::IsNullOrWhiteSpace($resolvedDeploymentId)) {
+  Write-Host "Deploying existing web app deployment"
+  $deployOutput = Invoke-Clasp -Arguments @(
+    "deploy",
+    "-i",
+    $resolvedDeploymentId,
+    "-d",
+    $deployDescription
+  ) -WorkingDirectory $projectDir
+}
 
 Write-Host ""
-Write-Host "Push complete"
+if ([string]::IsNullOrWhiteSpace($resolvedDeploymentId)) {
+  Write-Host "Push complete"
+}
+else {
+  Write-Host "Deploy complete"
+}
 Write-Host "scriptId  : $scriptId"
 Write-Host "editorUrl : $editorUrl"
-Write-Host ""
-Write-Host "Next steps"
-Write-Host "1. Open the editor URL"
-Write-Host "2. Deploy > New deployment > Web app"
-Write-Host "3. Execute as: Me"
-Write-Host "4. Who has access: Anyone"
-Write-Host "5. Copy the /exec URL into ..\\config.js"
+if (-not [string]::IsNullOrWhiteSpace($resolvedDeploymentId)) {
+  Write-Host "deploymentId: $resolvedDeploymentId"
+  Write-Host $deployOutput
+}
+else {
+  Write-Host ""
+  Write-Host "Next steps"
+  Write-Host "1. Open the editor URL"
+  Write-Host "2. Deploy > New deployment > Web app"
+  Write-Host "3. Execute as: Me"
+  Write-Host "4. Who has access: Anyone"
+  Write-Host "5. Copy the /exec URL into ..\\config.js"
+}

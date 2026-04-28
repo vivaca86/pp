@@ -98,6 +98,8 @@ const state = {
   session: "historical",
   dashboard: null,
   dashboardFromCache: false,
+  snapshotStatus: null,
+  snapshotRefreshing: false,
   activeView: "dashboard",
   lastDashboardLoadedAt: 0,
   mobileSlideIndex: 0,
@@ -126,6 +128,9 @@ const elements = {
   setupCard: document.getElementById("setup-card"),
   statusPill: document.getElementById("status-pill"),
   updatedAt: document.getElementById("updated-at"),
+  snapshotHealth: document.getElementById("snapshot-health"),
+  snapshotHealthText: document.getElementById("snapshot-health-text"),
+  snapshotRefreshButton: document.getElementById("snapshot-refresh-button"),
   slotGrid: document.getElementById("slot-grid"),
   tableHead: document.getElementById("table-head"),
   tableBody: document.getElementById("table-body"),
@@ -735,12 +740,50 @@ function setStatus(message, tone = "loading") {
   if (tone === "loading") elements.statusPill.classList.add("is-loading");
 }
 
+function renderSnapshotHealth(status = state.snapshotStatus) {
+  if (!elements.snapshotHealth || !elements.snapshotHealthText) return;
+
+  if (!status) {
+    elements.snapshotHealth.hidden = true;
+    return;
+  }
+
+  const ageText = formatAgeSeconds(status.snapshotAgeSeconds);
+  const sourceText = status.snapshotSource ? String(status.snapshotSource).trim() : "";
+  let message = "스냅샷 상태 확인 필요";
+  let toneClass = "is-warning";
+
+  if (status.error) {
+    message = formatAppErrorMessage(status.error);
+    toneClass = "is-error";
+  } else if (!status.hasSnapshot) {
+    message = "저장된 스냅샷이 없습니다";
+    toneClass = "is-warning";
+  } else if (status.snapshotFresh) {
+    message = ["스냅샷 정상", ageText, sourceText].filter(Boolean).join(" · ");
+    toneClass = "is-success";
+  } else {
+    message = ["스냅샷 오래됨", ageText, sourceText].filter(Boolean).join(" · ");
+    toneClass = "is-warning";
+  }
+
+  elements.snapshotHealth.hidden = false;
+  elements.snapshotHealth.className = `snapshot-health ${toneClass}`;
+  elements.snapshotHealthText.textContent = message;
+
+  if (elements.snapshotRefreshButton) {
+    elements.snapshotRefreshButton.disabled = Boolean(state.snapshotRefreshing || state.loading || state.saving);
+    elements.snapshotRefreshButton.textContent = state.snapshotRefreshing ? "갱신 중..." : "최신으로 갱신";
+  }
+}
+
 function setBusyState(isBusy) {
   state.loading = isBusy;
   elements.dateInput.disabled = isBusy;
   document.querySelectorAll(".slot-input[data-editable='true']").forEach((input) => {
     input.disabled = isBusy;
   });
+  renderSnapshotHealth();
 }
 
 function ensureGatewayCard() {
@@ -1500,6 +1543,18 @@ function renderDashboard(payload, options = {}) {
     `마지막 동기화 ${formatTimestamp(snapshotUpdatedAt)}`,
     snapshotAgeText ? `스냅샷 ${snapshotAgeText}` : ""
   ].filter(Boolean).join(" · ");
+  if (payload.snapshotUpdatedAt) {
+    state.snapshotStatus = {
+      ok: true,
+      selectedDate: payload.selectedDate,
+      hasSnapshot: true,
+      snapshotUpdatedAt: payload.snapshotUpdatedAt,
+      snapshotAgeSeconds: payload.snapshotAgeSeconds,
+      snapshotSource: payload.snapshotSource,
+      snapshotFresh: true
+    };
+    renderSnapshotHealth(state.snapshotStatus);
+  }
 
   renderSlots(payload.slots);
   renderTable(payload);
@@ -1524,6 +1579,13 @@ function bindEvents() {
     loadDashboard(elements.dateInput.value || getTodayKstDate()).catch((error) => {
       console.error(error);
       setStatus(error.message, "error");
+    });
+  });
+
+  elements.snapshotRefreshButton?.addEventListener("click", () => {
+    refreshDashboardSnapshotManually().catch((error) => {
+      console.error(error);
+      setStatus(error, "error");
     });
   });
 
@@ -1900,6 +1962,60 @@ async function requestGateway(params, options = {}) {
   return payload;
 }
 
+async function loadSnapshotStatus(date = state.selectedDate || elements.dateInput.value || getTodayKstDate()) {
+  if (!state.gatewayUrl || !elements.snapshotHealth) return null;
+
+  try {
+    const payload = await requestGateway({
+      action: "dashboard-snapshot-status",
+      date
+    });
+    state.snapshotStatus = payload;
+    renderSnapshotHealth(payload);
+    return payload;
+  } catch (error) {
+    state.snapshotStatus = { error };
+    renderSnapshotHealth(state.snapshotStatus);
+    console.warn("snapshot status check failed", error);
+    return null;
+  }
+}
+
+async function refreshDashboardSnapshotManually() {
+  if (state.snapshotRefreshing) return;
+
+  const date = state.selectedDate || elements.dateInput.value || getTodayKstDate();
+  state.snapshotRefreshing = true;
+  renderSnapshotHealth();
+  setStatus("최신 스냅샷을 갱신하는 중...", "loading");
+
+  try {
+    const payload = await requestGateway({
+      action: "dashboard-snapshot-refresh",
+      date
+    });
+
+    if (payload.throttled) {
+      state.snapshotStatus = payload;
+      renderSnapshotHealth(payload);
+      setStatus(`이미 갱신 요청이 처리 중입니다. ${Number(payload.retryAfterSeconds || 1)}초 뒤 다시 시도해 주세요.`, "loading");
+      return;
+    }
+
+    setStatus("최신 스냅샷 갱신 완료. 월간표를 다시 불러오는 중...", "loading");
+    await loadDashboard(date, { useCache: false });
+    await loadSnapshotStatus(date);
+  } catch (error) {
+    state.snapshotStatus = { error };
+    renderSnapshotHealth(state.snapshotStatus);
+    console.error(error);
+    setStatus(error, "error");
+  } finally {
+    state.snapshotRefreshing = false;
+    renderSnapshotHealth();
+  }
+}
+
 function getSlotCaption(slot) {
   if (!slot.editable) return "기준 지수";
   if (slot.stock) return `${slot.stock.market} · ${slot.stock.code}`;
@@ -2120,6 +2236,7 @@ async function loadDashboard(date = getTodayKstDate(), options = {}) {
     state.lastDashboardLoadedAt = Date.now();
     warmRecommendationUniverse(state.recommendations.filters, { silent: true }).catch(() => {});
     scheduleCatalogLoad();
+    loadSnapshotStatus(payload.selectedDate || date).catch(() => {});
     setStatus("업데이트 완료", "success");
   } catch (error) {
     console.error(error);

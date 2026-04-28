@@ -267,6 +267,54 @@ input {
   font-size: 12px;
 }
 
+.snapshot-health {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.snapshot-health[hidden] {
+  display: none;
+}
+
+.snapshot-health-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.snapshot-health.is-success .snapshot-health-text {
+  color: #0f766e;
+}
+
+.snapshot-health.is-warning .snapshot-health-text {
+  color: #9a5b00;
+}
+
+.snapshot-health.is-error .snapshot-health-text {
+  color: #b91c1c;
+}
+
+.snapshot-refresh-button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid rgba(0, 95, 115, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.snapshot-refresh-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .section-note {
   margin: 10px 0 0;
   line-height: 1.7;
@@ -809,6 +857,10 @@ thead th:first-child {
   .summary-head .status-stack {
     justify-self: end;
     text-align: right;
+  }
+
+  .summary-head .snapshot-health {
+    justify-content: flex-end;
   }
 
   .slot-grid {

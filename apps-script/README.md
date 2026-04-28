@@ -8,6 +8,8 @@ GET 액션:
 - `action=stock-catalog&market=ALL`
 - `action=stock-search&q=삼성`
 - `action=dashboard-data&date=2026-04-10`
+- `action=dashboard-snapshot-status&date=2026-04-10`
+- `action=dashboard-snapshot-refresh&date=2026-04-10`
 - `action=update-tickers&tickers=005930,000660,...&date=2026-04-10`
 - `action=fibonacci-warmup&date=2026-04-10&universe=KOSPI200&periodMonths=6&level=0.382&mode=near&lookbackDays=1&tolerance=0.01`
 - `action=fibonacci-recommendations&date=2026-04-10&universe=ALL&periodMonths=6&level=0.382&mode=near&lookbackDays=1&tolerance=0.01`
@@ -21,7 +23,15 @@ GET 액션:
 - KRX 마스터 파일로 종목명을 해석합니다.
 - KIS 시세 데이터로 피보나치 추천 후보를 계산합니다.
 
-배포 마무리:
+기존 운영 웹앱에 자동 배포:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ..\deploy-backend.ps1 -Description "Update pp sheet gateway"
+```
+
+이 스크립트는 `config.js`의 현재 `/exec` URL에서 deployment ID를 읽어 기존 웹앱 URL을 유지한 채 새 버전으로 배포합니다.
+
+처음 프로젝트를 만들 때만 수동 배포 마무리:
 
 1. `Deploy > New deployment`
 2. `Web app`
@@ -35,3 +45,4 @@ GET 액션:
 - 즉시 스냅샷을 갱신하려면 `refreshDashboardSnapshot()`을 실행합니다.
 - 트리거를 제거하려면 `removeDashboardSnapshotTrigger()`을 실행합니다.
 - 웹앱에서 `action=dashboard-snapshot-status`로 현재 스냅샷 상태를 확인할 수 있습니다.
+- 웹앱에서 `action=dashboard-snapshot-refresh`로 쿨다운이 적용된 수동 스냅샷 갱신을 요청할 수 있습니다.

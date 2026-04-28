@@ -8,6 +8,11 @@ This file is the handoff note for the next Codex session, possibly on another PC
 - The latest backend fix is pushed in Git commit `031bd1f`, but the live Apps Script project may still need manual save/deploy.
 - Deploy `apps-script/pp-sheet-gateway.gs` first so the dashboard uses the after-market snapshot fix and avoids the KIS master zip quota slowdown.
 
+Status update on 2026-04-28:
+- Local `main` was fast-forwarded to `origin/main`.
+- The existing live Apps Script deployment was updated with `clasp` to `@22`, then to `@23` after the snapshot health/manual refresh work below.
+- `dashboard-snapshot-status`, `dashboard-snapshot-refresh`, and `dashboard-data` were verified on the live `/exec` URL.
+
 ## Current State
 
 - Front-end is deployed from GitHub Pages.
@@ -16,8 +21,9 @@ This file is the handoff note for the next Codex session, possibly on another PC
 - Latest confirmed backend behavior:
   - `action=health` works.
   - `action=dashboard-snapshot-status` works.
-  - `dashboard-data` returns a fresh snapshot after `installDashboardSnapshotTrigger()` was run.
-  - The initial verified snapshot source was `manual`; next market session should show `trigger` if the time-based trigger is running.
+  - `action=dashboard-snapshot-refresh` works with a public cooldown.
+  - `dashboard-data` returns a fresh snapshot after manual refresh.
+  - The latest verified snapshot source was `manual`; next market session should show `trigger` if the time-based trigger is running.
 - The backend source in `apps-script/pp-sheet-gateway.gs` is ahead of the manually deployed Apps Script only if the user has not pasted/deployed the latest file. Always verify the live `/exec` URL before assuming deployment status.
 
 ## Top Priority Backlog
@@ -32,7 +38,7 @@ This file is the handoff note for the next Codex session, possibly on another PC
    - Expected user-facing change: dashboard snapshot display can drop from the current 2-3s Apps Script path toward roughly sub-second to 1s depending on the store/CDN.
    - Cost/complexity note: likely free at this scale, but adds account/API-token/CORS/fallback setup.
 
-2. Automate Apps Script deployment.
+2. Automate Apps Script deployment. **Done locally on 2026-04-28.**
    - Goal: stop requiring the user to paste code and manually deploy each backend change.
    - Use `clasp` against the existing production Apps Script project. Do not create a new Apps Script project unless the user explicitly asks.
    - Preserve the existing live `/exec` URL whenever possible. If a new deployment URL is issued, update `config.js` and verify GitHub Pages.
@@ -42,13 +48,13 @@ This file is the handoff note for the next Codex session, possibly on another PC
      - `?action=dashboard-snapshot-status`
      - repeated `?action=dashboard-data` timing and `snapshotSource`
 
-3. Add snapshot/trigger health monitoring.
+3. Add snapshot/trigger health monitoring. **Done locally on 2026-04-28.**
    - Goal: make stale or failed snapshots visible without opening Apps Script logs.
    - Front-end should call or reuse `action=dashboard-snapshot-status`.
    - Show a calm warning if `snapshotFresh` is false or `snapshotAgeSeconds` exceeds the configured freshness window.
    - Consider an admin-only or hidden diagnostics area showing `snapshotUpdatedAt`, `snapshotAgeSeconds`, and `snapshotSource`.
 
-4. Add a manual "refresh latest" control.
+4. Add a manual "refresh latest" control. **Done locally on 2026-04-28.**
    - Goal: let the user choose a slower real-time refresh when needed.
    - Suggested UX: show current snapshot immediately, then offer a "최신으로 갱신" button.
    - Backend should avoid an unbounded public heavy endpoint. Add throttling/cooldown or reuse an existing safe path rather than letting repeated clicks force expensive sheet recalculation.

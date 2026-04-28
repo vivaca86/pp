@@ -103,7 +103,8 @@ var PP_SHEET_GATEWAY = {
   dashboardSnapshotMaxAgeSeconds: 300,
   dashboardSnapshotTriggerMinutes: 1,
   dashboardSnapshotMarketOpenMinute: 8 * 60 + 55,
-  dashboardSnapshotMarketCloseMinute: 15 * 60 + 40
+  dashboardSnapshotMarketCloseMinute: 15 * 60 + 40,
+  dashboardManualRefreshCooldownSeconds: 120
 };
 
 function doGet(e) {
@@ -129,6 +130,8 @@ function routeGatewayAction_(action, params) {
       return handleDashboardData_(params);
     case 'dashboard-snapshot-status':
       return handleDashboardSnapshotStatus_(params);
+    case 'dashboard-snapshot-refresh':
+      return handleDashboardSnapshotRefresh_(params);
     case 'update-tickers':
       return handleUpdateTickers_(params);
     case 'equity-month':
@@ -237,6 +240,10 @@ function handleDashboardSnapshotStatus_(params) {
   var tickerCodes = getTickerCodes_(context.controlSheet);
   var snapshot = loadDashboardSnapshot_(dateIso, tickerCodes, true);
 
+  return buildDashboardSnapshotStatusPayload_(dateIso, tickerCodes, snapshot);
+}
+
+function buildDashboardSnapshotStatusPayload_(dateIso, tickerCodes, snapshot) {
   return {
     ok: true,
     selectedDate: dateIso,
@@ -247,6 +254,37 @@ function handleDashboardSnapshotStatus_(params) {
     snapshotSource: snapshot ? snapshot.snapshotSource : null,
     snapshotFresh: snapshot ? isDashboardSnapshotFresh_(snapshot, dateIso) : false
   };
+}
+
+function handleDashboardSnapshotRefresh_(params) {
+  var cooldownSeconds = Math.max(30, Math.round(Number(getSetting_(
+    'DASHBOARD_MANUAL_REFRESH_COOLDOWN_SECONDS',
+    PP_SHEET_GATEWAY.dashboardManualRefreshCooldownSeconds
+  )) || 120));
+  var cooldownKey = 'dashboard-snapshot-refresh:cooldown';
+  var cooldown = loadTransientCachedValue_(cooldownKey);
+  var nowMs = Date.now();
+  var untilMs = Number(cooldown && cooldown.untilMs) || 0;
+
+  if (untilMs > nowMs) {
+    var context = openDashboardContext_();
+    var dateIso = params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet);
+    var tickerCodes = getTickerCodes_(context.controlSheet);
+    var snapshot = loadDashboardSnapshot_(dateIso, tickerCodes, true);
+    var status = buildDashboardSnapshotStatusPayload_(dateIso, tickerCodes, snapshot);
+    status.throttled = true;
+    status.retryAfterSeconds = Math.max(1, Math.ceil((untilMs - nowMs) / 1000));
+    return status;
+  }
+
+  saveTransientCachedValueSeconds_(cooldownKey, {
+    untilMs: nowMs + (cooldownSeconds * 1000)
+  }, cooldownSeconds);
+
+  var result = refreshDashboardSnapshot_(true);
+  result.manualRefresh = true;
+  result.cooldownSeconds = cooldownSeconds;
+  return result;
 }
 
 function handleUpdateTickers_(params) {

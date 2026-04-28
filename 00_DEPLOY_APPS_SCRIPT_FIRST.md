@@ -10,6 +10,12 @@ Latest relevant commit:
 
 - `031bd1f` - `Keep dashboard snapshots fast after market close`
 
+2026-04-28 update:
+
+- The existing deployment was updated with `clasp` and verified at `@22`.
+- A follow-up deployment for snapshot health/manual refresh was verified at `@23`.
+- Recheck this file only if a future backend commit has not yet been deployed.
+
 What this fixes:
 
 - After market close, dashboard snapshots stay usable for the configured snapshot TTL instead of expiring after 5 minutes.
