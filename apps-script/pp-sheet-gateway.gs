@@ -337,6 +337,9 @@ function getDashboardSnapshotMaxAgeSeconds_(dateIso) {
   if (coerceIsoDate_(dateIso) !== todayIsoKst_()) {
     return getDashboardSnapshotTtlSeconds_();
   }
+  if (!shouldRunDashboardSnapshotTrigger_()) {
+    return getDashboardSnapshotTtlSeconds_();
+  }
   return Math.max(60, Number(getSetting_(
     'DASHBOARD_SNAPSHOT_MAX_AGE_SECONDS',
     PP_SHEET_GATEWAY.dashboardSnapshotMaxAgeSeconds
@@ -782,6 +785,7 @@ function isDashboardCellMeaningful_(cell) {
 }
 
 function buildSlotPayloads_(headerRow) {
+  var catalogByCode = buildCachedStockCatalogLookup_();
   var slots = [
     {
       editable: false,
@@ -801,7 +805,7 @@ function buildSlotPayloads_(headerRow) {
 
   for (var columnIndex = 3; columnIndex < 9; columnIndex += 1) {
     var code = sanitizeStockCode_(headerRow[columnIndex]);
-    var matched = code ? findStockByCode_(code) : null;
+    var matched = code ? catalogByCode[code] : null;
     slots.push({
       id: columnIndex - 2,
       editable: true,
@@ -813,6 +817,21 @@ function buildSlotPayloads_(headerRow) {
   }
 
   return slots;
+}
+
+function buildCachedStockCatalogLookup_() {
+  var cached = loadCachedValue_('catalog');
+  var catalog = cached && Array.isArray(cached.items) ? cached.items : [];
+  var lookup = {};
+
+  for (var i = 0; i < catalog.length; i += 1) {
+    var item = catalog[i];
+    if (item && item.code) {
+      lookup[item.code] = item;
+    }
+  }
+
+  return lookup;
 }
 
 function readTradingDates_(indexSheet) {
