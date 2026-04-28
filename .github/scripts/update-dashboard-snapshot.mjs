@@ -8,6 +8,7 @@ const outputPath = path.join(rootDir, "dashboard-latest.json");
 const marketTimezone = "Asia/Seoul";
 const quickStockCatalog = new Map([
   ["0183V0", { name: "KIWOOM 삼성전자&SK하이닉스채권혼합50", market: "KOSPI", assetType: "etf" }],
+  ["000660", { name: "SK하이닉스", market: "KOSPI", assetType: "stock" }],
   ["213420", { name: "덕산네오룩스", market: "KOSDAQ", assetType: "stock" }],
   ["042700", { name: "한미반도체", market: "KOSPI", assetType: "stock" }],
   ["319660", { name: "피에스케이", market: "KOSDAQ", assetType: "stock" }],

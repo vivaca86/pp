@@ -80,6 +80,7 @@ const LOCAL_STOCK_CATALOG = [
 
 const QUICK_STOCK_CATALOG = [
   { code: "0183V0", name: "KIWOOM 삼성전자&SK하이닉스채권혼합50", market: "KOSPI", assetType: "etf" },
+  { code: "000660", name: "SK하이닉스", market: "KOSPI", assetType: "stock" },
   { code: "213420", name: "덕산네오룩스", market: "KOSDAQ", assetType: "stock" },
   { code: "042700", name: "한미반도체", market: "KOSPI", assetType: "stock" },
   { code: "319660", name: "피에스케이", market: "KOSDAQ", assetType: "stock" },
