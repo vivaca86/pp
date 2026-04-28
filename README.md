@@ -1,5 +1,7 @@
 # PP Dashboard
 
+- Start here first on the next PC: [`00_DEPLOY_APPS_SCRIPT_FIRST.md`](./00_DEPLOY_APPS_SCRIPT_FIRST.md)
+
 - Next work queue for future Codex sessions: [`NEXT_WORK.md`](./NEXT_WORK.md)
 - Quick guide: `C:\Users\vivac\OneDrive\문서\aa\pp\QUICK_GUIDE.md`
 

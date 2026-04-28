@@ -2,6 +2,12 @@
 
 This file is the handoff note for the next Codex session, possibly on another PC. Start here before changing code.
 
+## First Task: Deploy Pending Apps Script Fix
+
+- Before starting the backlog below, open [`00_DEPLOY_APPS_SCRIPT_FIRST.md`](./00_DEPLOY_APPS_SCRIPT_FIRST.md).
+- The latest backend fix is pushed in Git commit `031bd1f`, but the live Apps Script project may still need manual save/deploy.
+- Deploy `apps-script/pp-sheet-gateway.gs` first so the dashboard uses the after-market snapshot fix and avoids the KIS master zip quota slowdown.
+
 ## Current State
 
 - Front-end is deployed from GitHub Pages.
