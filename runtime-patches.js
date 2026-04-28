@@ -183,6 +183,11 @@
 
         if (typeof loadDashboardPayloadWithRetry === "function") {
           loadDashboardPayloadWithRetry = async function (date, maxAttempts = 3) {
+            if (typeof loadDashboardPayloadFromStaticSnapshot === "function") {
+              const staticPayload = await loadDashboardPayloadFromStaticSnapshot(date);
+              if (staticPayload) return staticPayload;
+            }
+
             if (!state.dashboard || state.dashboardFromCache) {
               return loadDashboardPayloadFromSheetWithRetry(date, Math.min(maxAttempts, 2));
             }

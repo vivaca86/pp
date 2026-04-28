@@ -46,3 +46,9 @@ powershell -ExecutionPolicy Bypass -File ..\deploy-backend.ps1 -Description "Upd
 - 트리거를 제거하려면 `removeDashboardSnapshotTrigger()`을 실행합니다.
 - 웹앱에서 `action=dashboard-snapshot-status`로 현재 스냅샷 상태를 확인할 수 있습니다.
 - 웹앱에서 `action=dashboard-snapshot-refresh`로 쿨다운이 적용된 수동 스냅샷 갱신을 요청할 수 있습니다.
+
+정적 스냅샷 배포:
+
+- `.github/workflows/dashboard-snapshot.yml`이 주기적으로 `dashboard-data`를 호출합니다.
+- 결과는 GitHub Pages 루트의 `dashboard-latest.json`으로 커밋됩니다.
+- 프런트는 `config.js`의 `dashboardSnapshotUrl`을 먼저 읽고, 실패하면 이 Apps Script 웹앱으로 fallback합니다.

@@ -27,6 +27,10 @@ const DEFAULT_GATEWAY_URL = String(
   || window.STOCK_LAB_CONFIG?.gatewayUrl
   || ""
 ).trim();
+const DEFAULT_DASHBOARD_SNAPSHOT_URL = String(
+  window.PP_CONFIG?.dashboardSnapshotUrl
+  || "./dashboard-latest.json"
+).trim();
 const DEFAULT_DASHBOARD_SOURCE_MODE = "api";
 const recommendationWarmupState = {
   completedKeys: new Set(),
@@ -229,6 +233,20 @@ function formatTimestamp(value) {
     second: "2-digit",
     hour12: false
   }).format(date);
+}
+
+function getAgeSecondsFromTimestamp(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+}
+
+function normalizeDashboardPayloadAge(payload) {
+  if (payload?.snapshotUpdatedAt) {
+    payload.snapshotAgeSeconds = getAgeSecondsFromTimestamp(payload.snapshotUpdatedAt);
+  }
+  return payload;
 }
 
 function formatAgeSeconds(value) {
@@ -825,6 +843,14 @@ function buildRequestUrl(params) {
       url.searchParams.set(key, value);
     }
   });
+  return url.toString();
+}
+
+function buildDashboardSnapshotUrl(date) {
+  if (!DEFAULT_DASHBOARD_SNAPSHOT_URL) return "";
+  const url = new URL(DEFAULT_DASHBOARD_SNAPSHOT_URL, window.location.href);
+  if (date) url.searchParams.set("date", date);
+  url.searchParams.set("v", String(Math.floor(Date.now() / 60000)));
   return url.toString();
 }
 
@@ -1528,6 +1554,7 @@ function renderMobileCompare(payload) {
 }
 
 function renderDashboard(payload, options = {}) {
+  payload = normalizeDashboardPayloadAge(payload);
   state.dashboard = payload;
   state.dashboardFromCache = Boolean(options.fromCache);
   state.selectedDate = payload.selectedDate || state.selectedDate;
@@ -2169,6 +2196,34 @@ async function loadDashboardPayloadFromApi(date) {
   });
 }
 
+async function loadDashboardPayloadFromStaticSnapshot(date) {
+  const snapshotUrl = buildDashboardSnapshotUrl(date);
+  if (!snapshotUrl) return null;
+
+  try {
+    const response = await fetch(snapshotUrl, {
+      method: "GET",
+      cache: "no-store"
+    });
+
+    if (!response.ok) return null;
+
+    const payload = await response.json();
+    const requestedDate = String(date || "").trim();
+    if (!payload?.ok || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) return null;
+    if (requestedDate && payload.selectedDate !== requestedDate) return null;
+
+    return normalizeDashboardPayloadAge({
+      ...payload,
+      sourceMode: "static-snapshot",
+      staticSnapshot: true
+    });
+  } catch (error) {
+    console.warn("static dashboard snapshot failed", error);
+    return null;
+  }
+}
+
 async function loadDashboardPayloadFromSheetWithRetry(date, maxAttempts = 3) {
   let lastError = null;
 
@@ -2197,6 +2252,9 @@ async function loadDashboardPayloadFromSheetWithRetry(date, maxAttempts = 3) {
 }
 
 async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
+  const staticPayload = await loadDashboardPayloadFromStaticSnapshot(date);
+  if (staticPayload) return staticPayload;
+
   const sourceMode = getDashboardSourceMode();
   if (sourceMode === "sheet") {
     return loadDashboardPayloadFromSheetWithRetry(date, maxAttempts);

@@ -28,8 +28,12 @@ Status update on 2026-04-28:
 
 ## Top Priority Backlog
 
-1. Move dashboard snapshot delivery off Apps Script for faster first paint.
+1. Move dashboard snapshot delivery off Apps Script for faster first paint. **First pass done locally on 2026-04-28.**
    - Goal: user fetches static/CDN JSON instead of hitting Apps Script for dashboard reads.
+   - Implemented shape:
+     - GitHub Actions fetches the live Apps Script `dashboard-data` payload.
+     - The workflow commits `dashboard-latest.json` into the GitHub Pages root.
+     - The front-end tries `dashboard-latest.json` first and falls back to Apps Script when the file is missing or the selected date differs.
    - Candidate shape:
      - Apps Script trigger still computes the snapshot.
      - Snapshot is written to a faster store such as Cloudflare KV/R2 or another CDN-friendly JSON endpoint.
@@ -37,6 +41,7 @@ Status update on 2026-04-28:
      - Apps Script remains as fallback and for ticker updates.
    - Expected user-facing change: dashboard snapshot display can drop from the current 2-3s Apps Script path toward roughly sub-second to 1s depending on the store/CDN.
    - Cost/complexity note: likely free at this scale, but adds account/API-token/CORS/fallback setup.
+   - Future optional upgrade: replace GitHub Pages JSON with Cloudflare KV/R2 if lower update latency or fewer git commits are needed.
 
 2. Automate Apps Script deployment. **Done locally on 2026-04-28.**
    - Goal: stop requiring the user to paste code and manually deploy each backend change.

@@ -1,0 +1,38 @@
+name: Dashboard Snapshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "55 23 * * 0-4"
+    - cron: "*/5 0-6 * * 1-5"
+
+permissions:
+  contents: write
+
+jobs:
+  update-dashboard-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch dashboard snapshot
+        run: node .github/scripts/update-dashboard-snapshot.mjs
+
+      - name: Commit snapshot
+        run: |
+          if git diff --quiet -- dashboard-latest.json; then
+            echo "No dashboard snapshot changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dashboard-latest.json
+          git commit -m "Update dashboard snapshot"
+          git push

@@ -7,6 +7,8 @@
 
 구글 시트 `주식`을 반응형 웹 대시보드로 보여주는 프로젝트입니다.
 
+대시보드는 GitHub Pages의 `dashboard-latest.json` 정적 스냅샷을 먼저 읽고, 없거나 날짜가 맞지 않을 때 Apps Script 게이트웨이로 fallback합니다.
+
 핵심 동작:
 
 - `시트2!A3`를 기준일로 사용합니다.
