@@ -7,7 +7,7 @@ This repo is ready to deploy a small Worker that serves the dashboard snapshot f
 Use the Cloudflare screen you already opened:
 
 - Repository: `vivaca86/pp`
-- Project name: `pp`
+- Project name: `pp-dashboard-snapshot`
 - Build command: leave empty
 - Deploy command: `npx wrangler deploy`
 
@@ -16,7 +16,7 @@ The `wrangler.jsonc` file asks Wrangler to create the KV namespace automatically
 After the deploy finishes, open the Worker URL:
 
 ```txt
-https://pp.<your-workers-subdomain>.workers.dev/health
+https://pp-dashboard-snapshot.<your-workers-subdomain>.workers.dev/health
 ```
 
 Expected shape:
@@ -55,7 +55,7 @@ The scheduled `Dashboard Snapshot` GitHub Action will keep committing `dashboard
 Once the Worker URL is confirmed, change `config.js`:
 
 ```js
-dashboardSnapshotUrl: "https://pp.<your-workers-subdomain>.workers.dev/dashboard-latest.json",
+dashboardSnapshotUrl: "https://pp-dashboard-snapshot.<your-workers-subdomain>.workers.dev/dashboard-latest.json",
 ```
 
 Until then, the site keeps using the existing GitHub Pages snapshot:
