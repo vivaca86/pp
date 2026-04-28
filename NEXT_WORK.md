@@ -46,7 +46,7 @@ Status update on 2026-04-28:
      - `wrangler.jsonc` deploys the Worker from `workers/dashboard-snapshot.js`.
      - First Cloudflare deploy can auto-provision the KV namespace and bind it as `PP_DASHBOARD_SNAPSHOT`.
      - `.github/scripts/upload-dashboard-snapshot-to-kv.mjs` uploads `dashboard-latest.json` to KV when the Cloudflare GitHub secrets exist.
-     - Keep `config.js` on `./dashboard-latest.json` until the Worker URL is known, then switch `dashboardSnapshotUrl` to `https://pp-dashboard-snapshot.<workers-subdomain>.workers.dev/dashboard-latest.json`.
+     - `config.js` now reads `https://pp-dashboard-snapshot.vivaca86.workers.dev/dashboard-latest.json`.
 
 2. Automate Apps Script deployment. **Done locally on 2026-04-28.**
    - Goal: stop requiring the user to paste code and manually deploy each backend change.

@@ -64,14 +64,14 @@ The local `.cloudflare-secrets.ps1` file is ignored by Git and must not be commi
 
 ## Flip The Frontend
 
-Once the Worker URL is confirmed, change `config.js`:
+The Worker URL is:
 
-```js
-dashboardSnapshotUrl: "https://pp-dashboard-snapshot.<your-workers-subdomain>.workers.dev/dashboard-latest.json",
+```txt
+https://pp-dashboard-snapshot.vivaca86.workers.dev
 ```
 
-Until then, the site keeps using the existing GitHub Pages snapshot:
+The front-end now reads the Cloudflare snapshot first:
 
 ```js
-dashboardSnapshotUrl: "./dashboard-latest.json",
+dashboardSnapshotUrl: "https://pp-dashboard-snapshot.vivaca86.workers.dev/dashboard-latest.json",
 ```
