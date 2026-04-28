@@ -267,17 +267,17 @@
         <div class="view-switcher" role="tablist" aria-label="화면 전환">
           <button
             id="view-calculator-button"
-            class="view-switcher-button"
+            class="view-switcher-button is-active"
             type="button"
             data-view="calculator"
-            aria-pressed="false"
+            aria-pressed="true"
           >계산기</button>
           <button
             id="view-dashboard-button"
-            class="view-switcher-button is-active"
+            class="view-switcher-button"
             type="button"
             data-view="dashboard"
-            aria-pressed="true"
+            aria-pressed="false"
           >등가율</button>
           <button
             id="view-recommendation-button"
@@ -297,7 +297,7 @@
       </div>
     </section>
 
-    <section id="dashboard-summary" class="summary-card panel" data-view-page="dashboard">
+    <section id="dashboard-summary" class="summary-card panel" data-view-page="dashboard" hidden>
       <div class="section-head summary-head">
         <div>
           <h2>종목 구성</h2>
@@ -399,7 +399,7 @@
       <div id="recommendation-list" class="recommendation-list"></div>
     </section>
 
-    <section id="dashboard-table" class="table-card panel" data-view-page="dashboard">
+    <section id="dashboard-table" class="table-card panel" data-view-page="dashboard" hidden>
       <div class="section-head table-head">
         <div>
           <h2>월간 표</h2>
@@ -430,7 +430,7 @@
       </div>
     </section>
 
-    <section id="calculator-page" class="calculator-card panel" data-view-page="calculator" hidden>
+    <section id="calculator-page" class="calculator-card panel" data-view-page="calculator">
       <div class="section-head calculator-head">
         <div>
           <h2>계산기</h2>
@@ -444,16 +444,16 @@
 
   <nav class="mobile-bottom-nav" aria-label="모바일 메뉴">
     <button
-      class="mobile-bottom-nav-button"
-      type="button"
-      data-view="calculator"
-      aria-pressed="false"
-    >계산기</button>
-    <button
       class="mobile-bottom-nav-button is-active"
       type="button"
-      data-view="dashboard"
+      data-view="calculator"
       aria-pressed="true"
+    >계산기</button>
+    <button
+      class="mobile-bottom-nav-button"
+      type="button"
+      data-view="dashboard"
+      aria-pressed="false"
     >등가율</button>
     <button
       class="mobile-bottom-nav-button"
@@ -471,7 +471,7 @@
     window.PP_CONFIG.dashboardSourceMode = "sheet";
   </script>
   <script src="./dashboard-api-source.js?v=20260428g"></script>
-  <script src="./app.js?v=20260428g"></script>
+  <script src="./app.js?v=20260428i"></script>
   <script src="./runtime-patches.js?v=20260428h"></script>
   <script src="./calculator.js?v=20260428g"></script>
 </body>

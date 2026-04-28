@@ -116,7 +116,7 @@ const state = {
   dashboardFromCache: false,
   snapshotStatus: null,
   snapshotRefreshing: false,
-  activeView: "dashboard",
+  activeView: "calculator",
   lastDashboardLoadedAt: 0,
   mobileSlideIndex: 0,
   monthlyCache: new Map(),
@@ -170,6 +170,7 @@ const elements = {
   recommendationTolerance: document.getElementById("recommendation-tolerance"),
   recommendationSummary: document.getElementById("recommendation-summary"),
   recommendationList: document.getElementById("recommendation-list"),
+  calculatorViewButton: document.getElementById("view-calculator-button"),
   dashboardViewButton: document.getElementById("view-dashboard-button"),
   recommendationViewButton: document.getElementById("view-recommendation-button"),
   viewSections: [...document.querySelectorAll("[data-view-page]")],
@@ -921,6 +922,26 @@ function renderCachedDashboardIfAvailable(date) {
   renderDashboard(cachedPayload, { cache: false, fromCache: true });
   setStatus("저장된 월간표를 먼저 표시했습니다. 최신 데이터를 확인하는 중...", "loading");
   return true;
+}
+
+function deferDashboardLoadForDate(date) {
+  const nextDate = date || getTodayKstDate();
+  const previousDate = state.selectedDate;
+
+  state.selectedDate = nextDate;
+  localStorage.setItem(STORAGE_LAST_DATE, nextDate);
+
+  if (previousDate && previousDate !== nextDate) {
+    state.dashboard = null;
+    state.dashboardFromCache = false;
+    state.snapshotStatus = null;
+    state.lastDashboardLoadedAt = 0;
+    setRecommendationState({
+      items: [],
+      loading: false,
+      summary: ""
+    });
+  }
 }
 
 function getSeriesCacheKey(target, selectedDate) {
@@ -1694,7 +1715,13 @@ function renderDashboard(payload, options = {}) {
 
 function bindEvents() {
   elements.dateInput.addEventListener("change", () => {
-    loadDashboard(elements.dateInput.value || getTodayKstDate()).catch((error) => {
+    const nextDate = elements.dateInput.value || getTodayKstDate();
+    if (state.activeView === "calculator") {
+      deferDashboardLoadForDate(nextDate);
+      setStatus("계산기 준비 완료", "success");
+      return;
+    }
+    loadDashboard(nextDate).catch((error) => {
       console.error(error);
       setStatus(error.message, "error");
     });
@@ -1703,7 +1730,13 @@ function bindEvents() {
   elements.dateInput.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    loadDashboard(elements.dateInput.value || getTodayKstDate()).catch((error) => {
+    const nextDate = elements.dateInput.value || getTodayKstDate();
+    if (state.activeView === "calculator") {
+      deferDashboardLoadForDate(nextDate);
+      setStatus("계산기 준비 완료", "success");
+      return;
+    }
+    loadDashboard(nextDate).catch((error) => {
       console.error(error);
       setStatus(error.message, "error");
     });
@@ -1716,7 +1749,7 @@ function bindEvents() {
     });
   });
 
-  [elements.dashboardViewButton, elements.recommendationViewButton, ...elements.mobileViewButtons].forEach((button) => {
+  [elements.calculatorViewButton, elements.dashboardViewButton, elements.recommendationViewButton, ...elements.mobileViewButtons].forEach((button) => {
     if (!button) return;
     button.addEventListener("click", () => {
       const nextView = normalizeViewName(button.dataset.view || "dashboard");
@@ -2544,9 +2577,6 @@ async function bootstrap() {
   try {
     if (state.activeView === "calculator") {
       setStatus("계산기 준비 완료", "success");
-      loadDashboard(state.selectedDate).catch((error) => {
-        console.warn("dashboard preload failed", error);
-      });
       return;
     }
 
