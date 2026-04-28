@@ -87,7 +87,7 @@ const QUICK_STOCK_CATALOG = [
   { code: "005930", name: "삼성전자", market: "KOSPI", assetType: "stock" }
 ];
 
-LOCAL_STOCK_CATALOG.push(...QUICK_STOCK_CATALOG);
+LOCAL_STOCK_CATALOG.unshift(...QUICK_STOCK_CATALOG);
 
 const DEFAULT_SLOT_CODES = ["", "", "", "", "", ""];
 
@@ -295,6 +295,16 @@ function normalizeSearchText(value) {
 
 function normalizeTicker(value) {
   return String(value || "").trim().toUpperCase().replace(/^KRX:/i, "");
+}
+
+function extractTickerCode(value) {
+  const compact = String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/^KRX:/i, "")
+    .replace(/[^A-Z0-9]/g, "");
+  const match = compact.match(/[A-Z0-9]{6,9}/);
+  return match ? match[0] : "";
 }
 
 function buildAppError(code, message, extras = {}) {
@@ -982,13 +992,40 @@ function findCatalogItem(rawValue) {
   if (!input) return null;
 
   const normalizedTicker = normalizeTicker(input);
+  const extractedTicker = extractTickerCode(input);
   const normalizedText = normalizeSearchText(input);
+  let bestMatch = null;
 
-  return state.catalog.find((item) => {
+  state.catalog.forEach((item) => {
     const code = normalizeTicker(item.code);
     const name = normalizeSearchText(item.name);
-    return code === normalizedTicker || name === normalizedText;
-  }) || null;
+    const assetType = String(item.assetType || "").trim().toLowerCase();
+    let score = 0;
+
+    if (code === normalizedTicker || (extractedTicker && code === extractedTicker)) {
+      score = 1000;
+    } else if (name === normalizedText) {
+      score = 900;
+    } else if (normalizedText && code.startsWith(normalizedText)) {
+      score = 720;
+    } else if (normalizedText && name.startsWith(normalizedText)) {
+      score = 680;
+    } else if (normalizedText && name.endsWith(normalizedText)) {
+      score = 640;
+    } else if (normalizedText && (name.includes(normalizedText) || code.includes(normalizedText))) {
+      score = 520;
+    }
+
+    if (!score) return;
+    if (assetType === "stock") score += 20;
+    score -= Math.min(name.length, 80) / 100;
+
+    if (!bestMatch || score > bestMatch.score) {
+      bestMatch = { item, score };
+    }
+  });
+
+  return bestMatch?.item || null;
 }
 
 async function resolveStockInput(rawValue) {
@@ -1017,7 +1054,7 @@ function resolveTickerCode(rawValue) {
   const exact = findCatalogItem(raw);
   if (exact) return normalizeTicker(exact.code);
 
-  const ticker = normalizeTicker(raw);
+  const ticker = extractTickerCode(raw) || normalizeTicker(raw);
   if (/^[A-Z0-9]{6,9}$/.test(ticker)) {
     return ticker;
   }
@@ -1127,9 +1164,17 @@ function attachSlotEvents() {
     const input = card.querySelector(".slot-input");
     if (!input || input.dataset.editable !== "true") return;
 
+    input.addEventListener("compositionstart", () => {
+      input.dataset.composing = "true";
+    });
+    input.addEventListener("compositionend", () => {
+      input.dataset.composing = "false";
+      updateSlotPreview(card);
+    });
     input.addEventListener("input", () => updateSlotPreview(card));
     input.addEventListener("focus", () => scheduleCatalogLoad(), { once: true });
-    input.addEventListener("change", () => {
+    input.addEventListener("change", (event) => {
+      if (event.isComposing || input.dataset.composing === "true") return;
       updateSlotPreview(card);
       saveTickers().catch((error) => {
         console.error(error);
@@ -1138,6 +1183,11 @@ function attachSlotEvents() {
     });
     input.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
+      if (event.isComposing || event.keyCode === 229 || input.dataset.composing === "true") {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       event.preventDefault();
       saveTickers().catch((error) => {
         console.error(error);
