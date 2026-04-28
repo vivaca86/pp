@@ -1,4 +1,4 @@
 window.PP_CONFIG = {
-  gatewayUrl: "https://script.google.com/macros/s/AKfycbyOSKUGlOxhRrQNhqbfzJkvkusaEQF4Y1IAVaijwKpWefVMu98Ef62aZNAz0HQazMg5xQ/exec",
+  gatewayUrl: "https://script.google.com/macros/s/AKfycby4WQWoLEo8BhBDkz42SfCGFTzT_7E_gzeGUy70grkYdztxZEdObnnFqCELSyH3-x5uyw/exec",
   dashboardSourceMode: "sheet"
 };
