@@ -2,10 +2,10 @@
   "ok": true,
   "service": "pp-sheet-gateway",
   "spreadsheetTitle": "주식",
-  "selectedDate": "2026-04-28",
-  "selectedDateLabel": "2026.04.28",
-  "selectedDateIsTradingDay": true,
-  "today": "2026-04-28",
+  "selectedDate": "2026-04-29",
+  "selectedDateLabel": "2026.04.29",
+  "selectedDateIsTradingDay": false,
+  "today": "2026-04-29",
   "lastTradingDate": "2026-04-28",
   "lastTradingDateLabel": "2026.04.28",
   "tradingDateCount": 20,
@@ -15,14 +15,14 @@
       "code": "KOSPI",
       "name": "코스피",
       "market": "KOSPI",
-      "total": 0.35400746
+      "total": 0.35534159
     },
     {
       "editable": false,
       "code": "KOSDAQ",
       "name": "코스닥",
       "market": "KOSDAQ",
-      "total": 0.15892887
+      "total": 0.15028413
     },
     {
       "id": 1,
@@ -39,7 +39,7 @@
       "code": "213420",
       "name": "덕산네오룩스",
       "market": "KOSDAQ",
-      "total": 0.4113969,
+      "total": 0.40573653,
       "assetType": "stock"
     },
     {
@@ -48,7 +48,7 @@
       "code": "042700",
       "name": "한미반도체",
       "market": "KOSPI",
-      "total": 0.43132937,
+      "total": 0.39590702,
       "assetType": "stock"
     },
     {
@@ -57,7 +57,7 @@
       "code": "319660",
       "name": "피에스케이",
       "market": "KOSDAQ",
-      "total": 0.05027269,
+      "total": 0.0278128,
       "assetType": "stock"
     },
     {
@@ -72,10 +72,10 @@
     {
       "id": 6,
       "editable": true,
-      "code": "000660",
-      "name": "SK하이닉스",
+      "code": "005930",
+      "name": "삼성전자",
       "market": "KOSPI",
-      "total": 0.61951925,
+      "total": 0.34637854,
       "assetType": "stock"
     }
   ],
@@ -89,8 +89,8 @@
           "display": "0.39%"
         },
         {
-          "value": 0,
-          "display": "0.00%"
+          "value": -0.00864473,
+          "display": "-0.86%"
         },
         {
           "value": null,
@@ -113,8 +113,8 @@
           "display": "-"
         },
         {
-          "value": 0.00619195,
-          "display": "0.62%"
+          "value": -0.01113586,
+          "display": "-1.11%"
         }
       ]
     },
@@ -151,8 +151,8 @@
           "display": "-"
         },
         {
-          "value": 0.05728314,
-          "display": "5.73%"
+          "value": 0.02277904,
+          "display": "2.28%"
         }
       ]
     },
@@ -189,8 +189,8 @@
           "display": "-"
         },
         {
-          "value": -0.00244898,
-          "display": "-0.24%"
+          "value": -0.02227171,
+          "display": "-2.23%"
         }
       ]
     },
@@ -227,8 +227,8 @@
           "display": "-"
         },
         {
-          "value": 0.00163532,
-          "display": "0.16%"
+          "value": 0.03218391,
+          "display": "3.22%"
         }
       ]
     },
@@ -265,8 +265,8 @@
           "display": "-"
         },
         {
-          "value": -0.00081699,
-          "display": "-0.08%"
+          "value": -0.00684932,
+          "display": "-0.68%"
         }
       ]
     },
@@ -303,8 +303,8 @@
           "display": "-"
         },
         {
-          "value": 0.04974271,
-          "display": "4.97%"
+          "value": 0.02097902,
+          "display": "2.10%"
         }
       ]
     },
@@ -341,8 +341,8 @@
           "display": "-"
         },
         {
-          "value": 0.03368794,
-          "display": "3.37%"
+          "value": -0.00694444,
+          "display": "-0.69%"
         }
       ]
     },
@@ -379,8 +379,8 @@
           "display": "-"
         },
         {
-          "value": -0.02337662,
-          "display": "-2.34%"
+          "value": -0.00689655,
+          "display": "-0.69%"
         }
       ]
     },
@@ -417,8 +417,8 @@
           "display": "-"
         },
         {
-          "value": 0.01672535,
-          "display": "1.67%"
+          "value": 0.03080569,
+          "display": "3.08%"
         }
       ]
     },
@@ -455,8 +455,8 @@
           "display": "-"
         },
         {
-          "value": 0.0299184,
-          "display": "2.99%"
+          "value": 0.02179177,
+          "display": "2.18%"
         }
       ]
     },
@@ -493,8 +493,8 @@
           "display": "-"
         },
         {
-          "value": 0.06057692,
-          "display": "6.06%"
+          "value": 0.02736318,
+          "display": "2.74%"
         }
       ]
     },
@@ -531,8 +531,8 @@
           "display": "-"
         },
         {
-          "value": 0.01265823,
-          "display": "1.27%"
+          "value": -0.02427184,
+          "display": "-2.43%"
         }
       ]
     },
@@ -569,8 +569,8 @@
           "display": "-"
         },
         {
-          "value": 0.02905812,
-          "display": "2.91%"
+          "value": 0.00980392,
+          "display": "0.98%"
         }
       ]
     },
@@ -607,8 +607,8 @@
           "display": "-"
         },
         {
-          "value": -0.0338819,
-          "display": "-3.39%"
+          "value": -0.03087886,
+          "display": "-3.09%"
         }
       ]
     },
@@ -645,8 +645,8 @@
           "display": "-"
         },
         {
-          "value": 0.12772926,
-          "display": "12.77%"
+          "value": 0.07124682,
+          "display": "7.12%"
         }
       ]
     },
@@ -683,8 +683,8 @@
           "display": "-"
         },
         {
-          "value": 0.03386005,
-          "display": "3.39%"
+          "value": 0.01760746,
+          "display": "1.76%"
         }
       ]
     },
@@ -721,8 +721,8 @@
           "display": "-"
         },
         {
-          "value": 0.01141553,
-          "display": "1.14%"
+          "value": 0.03705693,
+          "display": "3.71%"
         }
       ]
     },
@@ -759,8 +759,8 @@
           "display": "-"
         },
         {
-          "value": 0.05542169,
-          "display": "5.54%"
+          "value": 0.04372197,
+          "display": "4.37%"
         }
       ]
     },
@@ -797,8 +797,8 @@
           "display": "-"
         },
         {
-          "value": -0.07469342,
-          "display": "-7.47%"
+          "value": -0.0593198,
+          "display": "-5.93%"
         }
       ]
     },
@@ -835,18 +835,18 @@
           "display": "-"
         },
         {
-          "value": 0.11152416,
-          "display": "11.15%"
+          "value": 0.13427033,
+          "display": "13.43%"
         }
       ]
     }
   ],
-  "updatedAt": "2026-04-28T20:50:32+09:00",
-  "snapshotUpdatedAt": "2026-04-28T20:50:32+09:00",
-  "snapshotAgeSeconds": 198,
-  "snapshotSource": "request",
+  "updatedAt": "2026-04-29T12:45:15+09:00",
+  "snapshotUpdatedAt": "2026-04-29T12:45:15+09:00",
+  "snapshotAgeSeconds": 15,
+  "snapshotSource": "trigger",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-04-28T11:53:50.629Z",
+  "staticPublishedAt": "2026-04-29T03:45:30.599Z",
   "staticGenerator": "github-actions"
 }
