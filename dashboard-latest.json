@@ -15,7 +15,7 @@
       "code": "KOSPI",
       "name": "코스피",
       "market": "KOSPI",
-      "total": 0.36059531
+      "total": 0.36107114
     },
     {
       "editable": false,
@@ -39,7 +39,7 @@
       "code": "213420",
       "name": "덕산네오룩스",
       "market": "KOSDAQ",
-      "total": 0.40384973,
+      "total": 0.39252898,
       "assetType": "stock"
     },
     {
@@ -48,7 +48,7 @@
       "code": "042700",
       "name": "한미반도체",
       "market": "KOSPI",
-      "total": 0.40271901,
+      "total": 0.40544381,
       "assetType": "stock"
     },
     {
@@ -57,7 +57,7 @@
       "code": "319660",
       "name": "피에스케이",
       "market": "KOSDAQ",
-      "total": 0.02995184,
+      "total": 0.03957751,
       "assetType": "stock"
     },
     {
@@ -75,7 +75,7 @@
       "code": "005930",
       "name": "삼성전자",
       "market": "KOSPI",
-      "total": 0.36777493,
+      "total": 0.36552268,
       "assetType": "stock"
     }
   ],
@@ -841,12 +841,12 @@
       ]
     }
   ],
-  "updatedAt": "2026-04-29T15:14:16+09:00",
-  "snapshotUpdatedAt": "2026-04-29T15:14:16+09:00",
-  "snapshotAgeSeconds": 17,
+  "updatedAt": "2026-04-29T15:40:19+09:00",
+  "snapshotUpdatedAt": "2026-04-29T15:40:19+09:00",
+  "snapshotAgeSeconds": 6913,
   "snapshotSource": "trigger",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-04-29T06:14:33.971Z",
+  "staticPublishedAt": "2026-04-29T08:35:32.771Z",
   "staticGenerator": "github-actions"
 }
