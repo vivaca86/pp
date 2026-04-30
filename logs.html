@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>PP 사용 로그</title>
+  <style>
+    :root {
+      --bg: #f3f7f8;
+      --panel: #ffffff;
+      --text: #102027;
+      --muted: #667985;
+      --line: rgba(15, 23, 42, 0.09);
+      --brand: #005f73;
+      --brand-soft: rgba(0, 95, 115, 0.1);
+      --green: #0f8f68;
+      --blue: #2563eb;
+      --amber: #c47f12;
+      --red: #c24135;
+      --shadow: 0 18px 38px -30px rgba(15, 23, 42, 0.55);
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: max(18px, env(safe-area-inset-top)) 14px max(22px, env(safe-area-inset-bottom));
+      background:
+        radial-gradient(circle at top left, rgba(0, 95, 115, 0.12), transparent 280px),
+        linear-gradient(180deg, #edf5f7 0, var(--bg) 340px);
+      color: var(--text);
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .shell {
+      width: min(780px, 100%);
+      margin: 0 auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .topbar p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .home-link {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.84);
+      color: var(--brand);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.88);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .control-panel {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .primary-button,
+    .ghost-button {
+      min-height: 48px;
+      border-radius: 16px;
+      padding: 0 16px;
+      font-weight: 900;
+    }
+
+    .primary-button {
+      flex: 1;
+      background: var(--brand);
+      color: white;
+    }
+
+    .ghost-button {
+      background: #fff;
+      color: var(--muted);
+      border: 1px solid var(--line);
+    }
+
+    .status {
+      min-height: 22px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.6;
+    }
+
+    .status.is-error {
+      color: var(--red);
+    }
+
+    .dashboard {
+      display: grid;
+      gap: 14px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .metric-card {
+      padding: 16px;
+      border-radius: 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
+    .metric-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .metric-card strong {
+      display: block;
+      margin-top: 7px;
+      font-size: 28px;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .section {
+      padding: 16px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .section-head span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .day-list,
+    .event-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .day-row {
+      display: grid;
+      grid-template-columns: 78px minmax(0, 1fr) 42px;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .bar {
+      height: 11px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.07);
+    }
+
+    .bar span {
+      display: block;
+      min-width: 4px;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--brand), #21a58b);
+    }
+
+    .event-row {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 58px;
+      padding: 10px;
+      border-radius: 16px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .event-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-weight: 950;
+    }
+
+    .event-main strong {
+      display: block;
+      font-size: 13px;
+    }
+
+    .event-main span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .event-time {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .empty {
+      padding: 20px 0;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 520px) {
+      .summary-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .metric-card {
+        padding: 14px;
+      }
+
+      .metric-card strong {
+        font-size: 24px;
+      }
+
+      .topbar h1 {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>사용 로그</h1>
+      <p>계산기, 등가율, 종목추천 사용량을 바로 확인합니다.</p>
+      </div>
+      <a class="home-link" href="./">PP로 이동</a>
+    </header>
+
+    <section class="control-panel panel" id="control-panel">
+      <div class="button-row">
+        <button id="load-button" class="primary-button" type="button">새로고침</button>
+      </div>
+      <p id="status" class="status">최근 사용량을 불러옵니다.</p>
+    </section>
+
+    <section class="dashboard" id="dashboard">
+      <div class="summary-grid">
+        <article class="metric-card">
+          <span>오늘 계산기</span>
+          <strong id="metric-calculator">0</strong>
+        </article>
+        <article class="metric-card">
+          <span>오늘 등가율</span>
+          <strong id="metric-dashboard">0</strong>
+        </article>
+        <article class="metric-card">
+          <span>오늘 종목추천</span>
+          <strong id="metric-recommendation">0</strong>
+        </article>
+        <article class="metric-card">
+          <span>추천 추가</span>
+          <strong id="metric-add">0</strong>
+        </article>
+      </div>
+
+      <section class="section panel">
+        <div class="section-head">
+          <h2>최근 7일</h2>
+          <span id="summary-served-at">-</span>
+        </div>
+        <div id="day-list" class="day-list"></div>
+      </section>
+
+      <section class="section panel">
+        <div class="section-head">
+          <h2>최근 로그</h2>
+          <button id="refresh-button" class="ghost-button" type="button">새로고침</button>
+        </div>
+        <div id="event-list" class="event-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="./config.js?v=20260430a"></script>
+  <script>
+    const config = window.PP_CONFIG || {};
+    const elements = {
+      load: document.getElementById("load-button"),
+      refresh: document.getElementById("refresh-button"),
+      status: document.getElementById("status"),
+      dashboard: document.getElementById("dashboard"),
+      calculator: document.getElementById("metric-calculator"),
+      dashboardMetric: document.getElementById("metric-dashboard"),
+      recommendation: document.getElementById("metric-recommendation"),
+      add: document.getElementById("metric-add"),
+      dayList: document.getElementById("day-list"),
+      eventList: document.getElementById("event-list"),
+      servedAt: document.getElementById("summary-served-at")
+    };
+
+    function getBaseUrl() {
+      if (config.usageLogBaseUrl) return String(config.usageLogBaseUrl).replace(/\/+$/, "");
+      if (config.usageLogUrl) return new URL(config.usageLogUrl).origin;
+      if (config.dashboardSnapshotUrl) return new URL(config.dashboardSnapshotUrl).origin;
+      return "";
+    }
+
+    function setStatus(text, isError = false) {
+      elements.status.textContent = text;
+      elements.status.classList.toggle("is-error", Boolean(isError));
+    }
+
+    function sumEvents(summary, names) {
+      const events = summary?.events || {};
+      return names.reduce((sum, name) => sum + Number(events[name] || 0), 0);
+    }
+
+    function formatDateTime(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "-";
+      return new Intl.DateTimeFormat("ko-KR", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(date);
+    }
+
+    function labelFor(event, labels = {}) {
+      return labels[event] || event || "-";
+    }
+
+    function iconFor(event) {
+      if (event?.startsWith("calculator")) return "계";
+      if (event?.startsWith("dashboard")) return "등";
+      if (event?.startsWith("recommendation")) return "추";
+      return "로";
+    }
+
+    async function apiGet(path) {
+      const baseUrl = getBaseUrl();
+      if (!baseUrl) throw new Error("usageLogBaseUrl 설정이 없습니다.");
+      const response = await fetch(`${baseUrl}${path}`, {
+        cache: "no-store"
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || payload.error || `로그 조회 실패 (${response.status})`);
+      }
+      return payload;
+    }
+
+    function renderSummary(payload) {
+      const today = payload.today || {};
+      elements.calculator.textContent = String(sumEvents(today, [
+        "calculator_view",
+        "calculator_input",
+        "calculator_reset"
+      ]));
+      elements.dashboardMetric.textContent = String(sumEvents(today, [
+        "dashboard_view",
+        "dashboard_load"
+      ]));
+      elements.recommendation.textContent = String(sumEvents(today, [
+        "recommendation_view",
+        "recommendation_run"
+      ]));
+      elements.add.textContent = String(sumEvents(today, ["recommendation_add"]));
+      elements.servedAt.textContent = formatDateTime(payload.servedAt);
+
+      const days = Array.isArray(payload.days) ? payload.days : [];
+      const max = Math.max(1, ...days.map((day) => Number(day.total || 0)));
+      elements.dayList.innerHTML = days.map((day) => {
+        const total = Number(day.total || 0);
+        const width = Math.max(4, Math.round((total / max) * 100));
+        return `
+          <div class="day-row">
+            <span>${day.day?.slice(5) || "-"}</span>
+            <div class="bar"><span style="width:${width}%"></span></div>
+            <strong>${total}</strong>
+          </div>
+        `;
+      }).join("") || '<div class="empty">아직 로그가 없습니다.</div>';
+    }
+
+    function renderEvents(payload) {
+      const events = Array.isArray(payload.events) ? payload.events : [];
+      elements.eventList.innerHTML = events.map((event) => `
+        <article class="event-row">
+          <div class="event-icon">${iconFor(event.event)}</div>
+          <div class="event-main">
+            <strong>${labelFor(event.event, payload.labels)}</strong>
+            <span>${event.selectedDate || event.day || "-"} · ${event.success === false ? "실패" : "정상"}</span>
+          </div>
+          <div class="event-time">${formatDateTime(event.createdAt)}</div>
+        </article>
+      `).join("") || '<div class="empty">최근 로그가 없습니다.</div>';
+    }
+
+    async function loadLogs() {
+      setStatus("로그를 불러오는 중입니다...");
+      elements.load.disabled = true;
+      elements.refresh.disabled = true;
+
+      try {
+        const [summary, recent] = await Promise.all([
+          apiGet("/usage-summary?days=7"),
+          apiGet("/usage-events?limit=50")
+        ]);
+        renderSummary(summary);
+        renderEvents(recent);
+        setStatus("최신 로그를 불러왔습니다.");
+      } catch (error) {
+        setStatus(error.message || "로그 조회에 실패했습니다.", true);
+      } finally {
+        elements.load.disabled = false;
+        elements.refresh.disabled = false;
+      }
+    }
+
+    elements.load.addEventListener("click", loadLogs);
+    elements.refresh.addEventListener("click", loadLogs);
+    loadLogs();
+  </script>
+</body>
+</html>

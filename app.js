@@ -373,6 +373,25 @@ function normalizeViewName(view) {
   return "dashboard";
 }
 
+function trackUsage(event, payload = {}) {
+  window.PPUsageLogger?.track(event, payload);
+}
+
+function markUsageStart() {
+  return window.PPUsageLogger?.markStart?.() ?? performance.now();
+}
+
+function usageDurationSince(startedAt) {
+  return window.PPUsageLogger?.durationSince?.(startedAt) ?? Math.max(0, Math.round(performance.now() - Number(startedAt || 0)));
+}
+
+function getUsageEventForView(view) {
+  const normalized = normalizeViewName(view);
+  if (normalized === "calculator") return "calculator_view";
+  if (normalized === "recommendations") return "recommendation_view";
+  return "dashboard_view";
+}
+
 function normalizeRecommendationUniverseClient(value) {
   const normalized = String(value || "").trim().toUpperCase();
   return normalized === "KOSPI200" ? "KOSPI200" : "KOSDAQ150";
@@ -396,6 +415,7 @@ function renderActiveView() {
 
 function setActiveView(view, options = {}) {
   const nextView = normalizeViewName(view);
+  const previousView = state.activeView;
   state.activeView = nextView;
   renderActiveView();
   renderRecommendationFilterPanel();
@@ -406,6 +426,15 @@ function setActiveView(view, options = {}) {
 
   if (nextView === "recommendations" && options.warmup !== false) {
     warmRecommendationUniverse(state.recommendations.filters, { silent: true }).catch(() => {});
+  }
+
+  if (options.track !== false && previousView !== nextView) {
+    trackUsage(getUsageEventForView(nextView), {
+      view: nextView,
+      metadata: {
+        reason: "view-switch"
+      }
+    });
   }
 }
 
@@ -2046,6 +2075,14 @@ async function addRecommendationToSlots(code, slotTarget = getRecommendationFilt
 
   await saveTickerCodes(nextCodes);
   setActiveView("dashboard");
+  trackUsage("recommendation_add", {
+    view: "recommendations",
+    selectedDate: state.selectedDate || elements.dateInput.value || getTodayKstDate(),
+    success: true,
+    metadata: {
+      slotTarget
+    }
+  });
 
   if (previousStock && normalizeTicker(previousStock.code) !== normalizeTicker(nextStock.code)) {
     setStatus(`${getEditableSlotLabel(targetSlot)}이 ${previousStock.name}에서 ${nextStock.name}(으)로 바뀌었습니다.`, "success");
@@ -2232,6 +2269,7 @@ async function loadRecommendations() {
 
   const filters = getRecommendationFilters();
   const selectedDate = state.selectedDate || elements.dateInput.value || getTodayKstDate();
+  const usageStartedAt = markUsageStart();
 
   await ensureDashboardReadyForRecommendationFlow(selectedDate);
   await waitForRecommendationCooldown(filters);
@@ -2285,6 +2323,21 @@ async function loadRecommendations() {
       lookbackDays: filters.lookbackDays,
       tolerance: filters.tolerance
     });
+    trackUsage("recommendation_run", {
+      view: "recommendations",
+      selectedDate,
+      success: true,
+      durationMs: usageDurationSince(usageStartedAt),
+      metadata: {
+        universe: filters.universe,
+        periodMonths: filters.periodMonths,
+        level: filters.level,
+        mode: filters.mode,
+        lookbackDays: filters.lookbackDays,
+        tolerance: filters.tolerance,
+        resultCount: Array.isArray(payload.items) ? payload.items.length : 0
+      }
+    });
 
     setRecommendationState({
       loading: false,
@@ -2302,6 +2355,19 @@ async function loadRecommendations() {
       items: [],
       filters,
       summary: formatAppErrorMessage(error)
+    });
+    trackUsage("recommendation_run", {
+      view: "recommendations",
+      selectedDate,
+      success: false,
+      durationMs: usageDurationSince(usageStartedAt),
+      metadata: {
+        universe: filters.universe,
+        periodMonths: filters.periodMonths,
+        level: filters.level,
+        mode: filters.mode,
+        reason: String(error?.code || error?.message || "recommendation_failed").slice(0, 48)
+      }
     });
     throw error;
   }
@@ -2403,6 +2469,7 @@ async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
 }
 
 async function loadDashboard(date = getTodayKstDate(), options = {}) {
+  const usageStartedAt = markUsageStart();
   const previousDate = state.selectedDate;
   if (previousDate && previousDate !== date) {
     setRecommendationState({
@@ -2432,9 +2499,38 @@ async function loadDashboard(date = getTodayKstDate(), options = {}) {
     if (!staticPayload) {
       scheduleCatalogLoad();
       loadSnapshotStatus(payload.selectedDate || date).catch(() => {});
+      trackUsage("dashboard_load", {
+        view: "dashboard",
+        selectedDate: payload.selectedDate || date,
+        success: true,
+        durationMs: usageDurationSince(usageStartedAt),
+        metadata: {
+          source: staticPayload ? "snapshot" : getDashboardSourceMode()
+        }
+      });
+    }
+    if (staticPayload) {
+      trackUsage("dashboard_load", {
+        view: "dashboard",
+        selectedDate: payload.selectedDate || date,
+        success: true,
+        durationMs: usageDurationSince(usageStartedAt),
+        metadata: {
+          source: "snapshot"
+        }
+      });
     }
     setStatus("업데이트 완료", "success");
   } catch (error) {
+    trackUsage("dashboard_load", {
+      view: "dashboard",
+      selectedDate: date,
+      success: false,
+      durationMs: usageDurationSince(usageStartedAt),
+      metadata: {
+        reason: String(error?.code || error?.message || "dashboard_load_failed").slice(0, 48)
+      }
+    });
     console.error(error);
     setStatus(error, "error");
   } finally {

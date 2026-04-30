@@ -224,6 +224,17 @@
             if (cardElement) {
               renderCardOutputs(cardElement, computeCard(calculatorState.cards[cardIndex]));
             }
+            window.PPUsageLogger?.trackDebounced?.(
+              `calculator-input-${cardIndex}`,
+              "calculator_input",
+              {
+                view: "calculator",
+                metadata: {
+                  cardIndex,
+                  field
+                }
+              }
+            );
           });
         });
 
@@ -234,6 +245,10 @@
             persistCalculatorCards();
             renderCalculatorCards();
             bindCalculatorEvents();
+            window.PPUsageLogger?.track?.("calculator_reset", {
+              view: "calculator",
+              success: true
+            });
           });
         }
       };
@@ -265,6 +280,7 @@
 
         setActiveView = function (view, options = {}) {
           const nextView = normalizeViewName(view);
+          const previousView = state.activeView;
           state.activeView = nextView;
           renderActiveView();
 
@@ -280,6 +296,22 @@
             && options.warmup !== false
             && typeof warmRecommendationUniverse === "function") {
             warmRecommendationUniverse(state.recommendations.filters, { silent: true }).catch(() => {});
+          }
+
+          if (options.track !== false && previousView !== nextView) {
+            window.PPUsageLogger?.track?.(
+              nextView === "calculator"
+                ? "calculator_view"
+                : nextView === "recommendations"
+                  ? "recommendation_view"
+                  : "dashboard_view",
+              {
+                view: nextView,
+                metadata: {
+                  reason: "view-switch"
+                }
+              }
+            );
           }
         };
 

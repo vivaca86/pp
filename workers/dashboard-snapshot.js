@@ -1,11 +1,23 @@
 const DEFAULT_SNAPSHOT_KEY = "dashboard-latest.json";
 const DEFAULT_FALLBACK_SNAPSHOT_URL = "https://vivaca86.github.io/pp/dashboard-latest.json";
+const DEFAULT_USAGE_LOG_RETENTION_DAYS = 90;
+const DEFAULT_USAGE_RECENT_LIMIT = 100;
+const USAGE_EVENT_LABELS = {
+  calculator_view: "계산기 열림",
+  calculator_input: "계산기 입력",
+  calculator_reset: "계산기 초기화",
+  dashboard_view: "등가율 열림",
+  dashboard_load: "등가율 로드",
+  recommendation_view: "종목추천 열림",
+  recommendation_run: "종목추천 실행",
+  recommendation_add: "추천 종목 추가"
+};
 
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400"
   };
 }
@@ -33,6 +45,321 @@ function isSnapshotRoute(pathname) {
   return pathname === "/dashboard-latest.json"
     || pathname === "/dashboard"
     || pathname === "/snapshot";
+}
+
+function isUsageLogRoute(pathname) {
+  return pathname === "/usage-log";
+}
+
+function isUsageSummaryRoute(pathname) {
+  return pathname === "/usage-summary";
+}
+
+function isUsageEventsRoute(pathname) {
+  return pathname === "/usage-events";
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function getKstDay(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value])
+  );
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function addDays(day, offset) {
+  const date = new Date(`${day}T12:00:00+09:00`);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return getKstDay(date);
+}
+
+function safeText(value, maxLength = 80) {
+  return String(value || "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function safeDate(value) {
+  const text = safeText(value, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+}
+
+function normalizeUsageEventName(value) {
+  const event = safeText(value, 48).toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  return Object.prototype.hasOwnProperty.call(USAGE_EVENT_LABELS, event) ? event : "unknown";
+}
+
+function sanitizeUsageMetadata(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const allowedKeys = [
+    "source",
+    "reason",
+    "field",
+    "cardIndex",
+    "periodMonths",
+    "level",
+    "mode",
+    "lookbackDays",
+    "tolerance",
+    "universe",
+    "slotTarget",
+    "resultCount"
+  ];
+  const metadata = {};
+  allowedKeys.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) return;
+    const raw = value[key];
+    if (typeof raw === "number") {
+      metadata[key] = Number.isFinite(raw) ? raw : null;
+    } else if (typeof raw === "boolean") {
+      metadata[key] = raw;
+    } else {
+      metadata[key] = safeText(raw, 48);
+    }
+  });
+  return metadata;
+}
+
+function createEmptyUsageSummary(day) {
+  return {
+    day,
+    total: 0,
+    events: {},
+    views: {},
+    successes: 0,
+    failures: 0,
+    avgDurationMs: null,
+    durationCount: 0,
+    durationTotalMs: 0,
+    updatedAt: null
+  };
+}
+
+function compactUsageEvent(event) {
+  return {
+    id: event.id,
+    event: event.event,
+    label: USAGE_EVENT_LABELS[event.event] || event.event,
+    view: event.view,
+    selectedDate: event.selectedDate,
+    success: event.success,
+    durationMs: event.durationMs,
+    metadata: event.metadata,
+    createdAt: event.createdAt,
+    day: event.day
+  };
+}
+
+function getUsageKv(env) {
+  return env.PP_USAGE_LOGS || env.PP_DASHBOARD_SNAPSHOT || null;
+}
+
+async function parseUsageRequest(request) {
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (Number.isFinite(contentLength) && contentLength > 4096) return null;
+
+  let payload = null;
+  try {
+    payload = await request.json();
+  } catch {
+    return null;
+  }
+
+  const now = new Date();
+  const event = normalizeUsageEventName(payload?.event);
+  if (event === "unknown") return null;
+
+  const view = safeText(payload?.view, 32).toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  const durationMs = Number(payload?.durationMs);
+
+  return {
+    id: crypto.randomUUID(),
+    event,
+    view: view || "",
+    selectedDate: safeDate(payload?.selectedDate),
+    success: payload?.success === undefined ? null : Boolean(payload.success),
+    durationMs: Number.isFinite(durationMs) ? clampNumber(durationMs, 0, 10 * 60 * 1000, 0) : null,
+    metadata: sanitizeUsageMetadata(payload?.metadata),
+    createdAt: now.toISOString(),
+    day: getKstDay(now)
+  };
+}
+
+async function updateUsageSummary(env, event, expirationTtl) {
+  const usageKv = getUsageKv(env);
+  if (!usageKv) return;
+  const key = `usage:summary:${event.day}`;
+  let summary = createEmptyUsageSummary(event.day);
+  try {
+    const stored = await usageKv.get(key, { type: "json" });
+    if (stored && typeof stored === "object") {
+      summary = {
+        ...summary,
+        ...stored,
+        events: stored.events && typeof stored.events === "object" ? stored.events : {},
+        views: stored.views && typeof stored.views === "object" ? stored.views : {}
+      };
+    }
+  } catch {
+    summary = createEmptyUsageSummary(event.day);
+  }
+
+  summary.total = Number(summary.total || 0) + 1;
+  summary.events[event.event] = Number(summary.events[event.event] || 0) + 1;
+  if (event.view) summary.views[event.view] = Number(summary.views[event.view] || 0) + 1;
+  if (event.success === true) summary.successes = Number(summary.successes || 0) + 1;
+  if (event.success === false) summary.failures = Number(summary.failures || 0) + 1;
+  if (Number.isFinite(event.durationMs)) {
+    summary.durationCount = Number(summary.durationCount || 0) + 1;
+    summary.durationTotalMs = Number(summary.durationTotalMs || 0) + Number(event.durationMs);
+    summary.avgDurationMs = Math.round(summary.durationTotalMs / summary.durationCount);
+  }
+  summary.updatedAt = new Date().toISOString();
+
+  await usageKv.put(key, JSON.stringify(summary), { expirationTtl });
+}
+
+async function updateRecentUsageEvents(env, event, expirationTtl) {
+  const usageKv = getUsageKv(env);
+  if (!usageKv) return;
+  const key = "usage:recent";
+  let events = [];
+  try {
+    const stored = await usageKv.get(key, { type: "json" });
+    if (Array.isArray(stored)) events = stored;
+  } catch {
+    events = [];
+  }
+
+  events.unshift(compactUsageEvent(event));
+  events = events.slice(0, DEFAULT_USAGE_RECENT_LIMIT);
+  await usageKv.put(key, JSON.stringify(events), { expirationTtl });
+}
+
+async function storeUsageEvent(env, event) {
+  const usageKv = getUsageKv(env);
+  if (!usageKv?.put) return;
+  const retentionDays = clampNumber(env.USAGE_LOG_RETENTION_DAYS, 1, 365, DEFAULT_USAGE_LOG_RETENTION_DAYS);
+  const expirationTtl = Math.round(retentionDays * 24 * 60 * 60);
+  const eventKey = `usage:event:${event.day}:${event.createdAt}:${event.id}`;
+
+  await Promise.all([
+    usageKv.put(eventKey, JSON.stringify(compactUsageEvent(event)), { expirationTtl }),
+    updateUsageSummary(env, event, expirationTtl),
+    updateRecentUsageEvents(env, event, expirationTtl)
+  ]);
+}
+
+async function recordUsageRequest(request, env) {
+  const event = await parseUsageRequest(request);
+  if (!event) return;
+  await storeUsageEvent(env, event);
+}
+
+function serveUsageLog(request, env, ctx) {
+  if (request.method !== "POST") {
+    return jsonResponse({
+      ok: false,
+      error: "method_not_allowed"
+    }, {
+      status: 405,
+      headers: { Allow: "POST, OPTIONS" }
+    });
+  }
+
+  const task = recordUsageRequest(request, env).catch((error) => {
+    console.warn("usage log write failed", error);
+  });
+  if (ctx?.waitUntil) ctx.waitUntil(task);
+
+  return emptyResponse(204);
+}
+
+async function serveUsageSummary(request, env) {
+  const usageKv = getUsageKv(env);
+
+  if (!usageKv?.get) {
+    return jsonResponse({
+      ok: false,
+      error: "usage_log_kv_missing"
+    }, {
+      status: 503,
+      headers: { "Cache-Control": "no-store" }
+    });
+  }
+
+  const url = new URL(request.url);
+  const days = clampNumber(url.searchParams.get("days"), 1, 30, 7);
+  const today = getKstDay();
+  const summaries = [];
+
+  for (let index = days - 1; index >= 0; index -= 1) {
+    const day = addDays(today, -index);
+    const stored = await usageKv.get(`usage:summary:${day}`, { type: "json" });
+    summaries.push({
+      ...createEmptyUsageSummary(day),
+      ...(stored && typeof stored === "object" ? stored : {})
+    });
+  }
+
+  const totals = summaries.reduce((acc, summary) => {
+    acc.total += Number(summary.total || 0);
+    Object.entries(summary.events || {}).forEach(([event, count]) => {
+      acc.events[event] = Number(acc.events[event] || 0) + Number(count || 0);
+    });
+    return acc;
+  }, { total: 0, events: {} });
+
+  return jsonResponse({
+    ok: true,
+    labels: USAGE_EVENT_LABELS,
+    today: summaries[summaries.length - 1] || createEmptyUsageSummary(today),
+    days: summaries,
+    totals,
+    servedAt: new Date().toISOString()
+  }, {
+    headers: { "Cache-Control": "no-store" }
+  });
+}
+
+async function serveUsageEvents(request, env) {
+  const usageKv = getUsageKv(env);
+
+  if (!usageKv?.get) {
+    return jsonResponse({
+      ok: false,
+      error: "usage_log_kv_missing"
+    }, {
+      status: 503,
+      headers: { "Cache-Control": "no-store" }
+    });
+  }
+
+  const url = new URL(request.url);
+  const limit = clampNumber(url.searchParams.get("limit"), 1, 200, 50);
+  const stored = await usageKv.get("usage:recent", { type: "json" });
+  const events = Array.isArray(stored) ? stored.slice(0, limit) : [];
+
+  return jsonResponse({
+    ok: true,
+    labels: USAGE_EVENT_LABELS,
+    events,
+    servedAt: new Date().toISOString()
+  }, {
+    headers: { "Cache-Control": "no-store" }
+  });
 }
 
 function parseSnapshot(text) {
@@ -165,11 +492,15 @@ async function serveSnapshot(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
       return emptyResponse();
+    }
+
+    if (isUsageLogRoute(url.pathname)) {
+      return serveUsageLog(request, env, ctx);
     }
 
     if (request.method !== "GET" && request.method !== "HEAD") {
@@ -189,6 +520,7 @@ export default {
         ok: true,
         service: "pp-dashboard-snapshot",
         kvBinding: Boolean(env.PP_DASHBOARD_SNAPSHOT?.get),
+        usageLogBinding: Boolean(getUsageKv(env)?.get),
         snapshotKey: env.SNAPSHOT_KEY || DEFAULT_SNAPSHOT_KEY
       }, {
         headers: {
@@ -199,6 +531,14 @@ export default {
 
     if (isSnapshotRoute(url.pathname)) {
       return serveSnapshot(request, env);
+    }
+
+    if (isUsageSummaryRoute(url.pathname)) {
+      return serveUsageSummary(request, env);
+    }
+
+    if (isUsageEventsRoute(url.pathname)) {
+      return serveUsageEvents(request, env);
     }
 
     return jsonResponse({
