@@ -392,6 +392,77 @@ function getUsageEventForView(view) {
   return "dashboard_view";
 }
 
+function roundUsageNumber(value, digits = 4) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Number(number.toFixed(digits));
+}
+
+function buildUsageStockMeta(slot, cell = null) {
+  const stock = slot?.stock || enrichStockMeta(slot);
+  const code = normalizeTicker(stock?.code || slot?.code || slot?.query || "");
+  const name = stock?.name || slot?.name || code || "";
+  const equalRate = Number(cell?.value);
+  return {
+    id: Number(slot?.id || 0) || null,
+    code,
+    name,
+    market: stock?.market || slot?.market || "",
+    equalRatePct: Number.isFinite(equalRate) ? roundUsageNumber(equalRate * 100, 2) : null,
+    equalRateDisplay: cell?.display || ""
+  };
+}
+
+function buildDashboardUsageMetadata(payload, source) {
+  const selectedDate = payload?.selectedDate || state.selectedDate || elements.dateInput?.value || "";
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const row = rows.find((item) => item.date === selectedDate) || rows[rows.length - 1] || null;
+  const slots = Array.isArray(payload?.slots) ? payload.slots : [];
+  const searchedStocks = slots
+    .map((slot, index) => ({ slot, cell: row?.values?.[index] || null }))
+    .filter(({ slot }) => slot?.editable && (slot.code || slot.name || slot.stock?.code))
+    .map(({ slot, cell }) => buildUsageStockMeta(slot, cell));
+
+  return {
+    source,
+    selectedDateRow: row?.date || "",
+    slotCodes: searchedStocks.map((stock) => stock.code).filter(Boolean),
+    slotNames: searchedStocks.map((stock) => stock.name).filter(Boolean),
+    searchedStocks
+  };
+}
+
+function buildDashboardSearchMetadata(codes = []) {
+  const searchedStocks = codes.map((code, index) => {
+    const normalized = normalizeTicker(code);
+    const stock = findCatalogItem(normalized) || enrichStockMeta({ code: normalized });
+    return {
+      id: index + 1,
+      code: normalized,
+      name: stock?.name || normalized,
+      market: stock?.market || ""
+    };
+  }).filter((stock) => stock.code || stock.name);
+
+  return {
+    slotCodes: searchedStocks.map((stock) => stock.code).filter(Boolean),
+    slotNames: searchedStocks.map((stock) => stock.name).filter(Boolean),
+    searchedStocks
+  };
+}
+
+function trackDashboardSearch(codes, selectedDate, success = true, extraMetadata = {}) {
+  trackUsage("dashboard_search", {
+    view: "dashboard",
+    selectedDate,
+    success,
+    metadata: {
+      ...buildDashboardSearchMetadata(codes),
+      ...extraMetadata
+    }
+  });
+}
+
 function normalizeRecommendationUniverseClient(value) {
   const normalized = String(value || "").trim().toUpperCase();
   return normalized === "KOSPI200" ? "KOSPI200" : "KOSDAQ150";
@@ -1257,6 +1328,7 @@ async function saveTickerCodes(codes) {
     tickers: codes.join(","),
     date: targetDate
   });
+  trackDashboardSearch(requestedCodes, targetDate, true);
 
   const areTickersApplied = (payload) => {
     const applied = Array.isArray(payload?.slots)
@@ -2504,9 +2576,7 @@ async function loadDashboard(date = getTodayKstDate(), options = {}) {
         selectedDate: payload.selectedDate || date,
         success: true,
         durationMs: usageDurationSince(usageStartedAt),
-        metadata: {
-          source: staticPayload ? "snapshot" : getDashboardSourceMode()
-        }
+        metadata: buildDashboardUsageMetadata(payload, staticPayload ? "snapshot" : getDashboardSourceMode())
       });
     }
     if (staticPayload) {
@@ -2515,9 +2585,7 @@ async function loadDashboard(date = getTodayKstDate(), options = {}) {
         selectedDate: payload.selectedDate || date,
         success: true,
         durationMs: usageDurationSince(usageStartedAt),
-        metadata: {
-          source: "snapshot"
-        }
+        metadata: buildDashboardUsageMetadata(payload, "snapshot")
       });
     }
     setStatus("업데이트 완료", "success");

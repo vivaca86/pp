@@ -21,8 +21,10 @@ Keys are prefixed with `usage:` so they do not conflict with the dashboard snaps
 ## What is logged
 
 - Calculator view/input/reset events
-- Equal-rate dashboard view/load events
-- Recommendation page/run events
-- Recommendation add events
+- Calculator inputs store the filled card, high/low/spread, and Fibonacci level results when the card is calculable
+- Equal-rate dashboard view/load/search events
+- Equal-rate searches store searched stock names/codes and the selected-date equal-rate value when available
+- Recommendation page/run events, run filters, and result count
+- Recommendation add events store the target slot only
 
-Raw calculator prices and selected recommendation ticker codes are not stored.
+Logs are intentionally small and are sent in the background so normal calculator and dashboard interactions do not wait for logging.

@@ -8,6 +8,7 @@ const USAGE_EVENT_LABELS = {
   calculator_reset: "계산기 초기화",
   dashboard_view: "등가율 열림",
   dashboard_load: "등가율 로드",
+  dashboard_search: "등가율 종목 검색",
   recommendation_view: "종목추천 열림",
   recommendation_run: "종목추천 실행",
   recommendation_add: "추천 종목 추가"
@@ -96,9 +97,34 @@ function safeDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
 }
 
+function safeMetadataKey(value) {
+  return safeText(value, 40).replace(/[^A-Za-z0-9_-]/g, "");
+}
+
 function normalizeUsageEventName(value) {
   const event = safeText(value, 48).toLowerCase().replace(/[^a-z0-9_-]/g, "");
   return Object.prototype.hasOwnProperty.call(USAGE_EVENT_LABELS, event) ? event : "unknown";
+}
+
+function sanitizeMetadataValue(raw, depth = 0) {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "number") return Number.isFinite(raw) ? Number(raw.toFixed(6)) : null;
+  if (typeof raw === "boolean") return raw;
+  if (typeof raw === "string") return safeText(raw, 160);
+  if (Array.isArray(raw)) {
+    if (depth >= 3) return [];
+    return raw.slice(0, 20).map((item) => sanitizeMetadataValue(item, depth + 1));
+  }
+  if (typeof raw === "object") {
+    if (depth >= 3) return {};
+    return Object.entries(raw).slice(0, 40).reduce((acc, [key, value]) => {
+      const safeKey = safeMetadataKey(key);
+      if (!safeKey) return acc;
+      acc[safeKey] = sanitizeMetadataValue(value, depth + 1);
+      return acc;
+    }, {});
+  }
+  return safeText(raw, 80);
 }
 
 function sanitizeUsageMetadata(value) {
@@ -107,7 +133,18 @@ function sanitizeUsageMetadata(value) {
     "source",
     "reason",
     "field",
+    "state",
     "cardIndex",
+    "high",
+    "low",
+    "spread",
+    "spreadRatePct",
+    "levels",
+    "slots",
+    "slotCodes",
+    "slotNames",
+    "searchedStocks",
+    "selectedDateRow",
     "periodMonths",
     "level",
     "mode",
@@ -120,14 +157,7 @@ function sanitizeUsageMetadata(value) {
   const metadata = {};
   allowedKeys.forEach((key) => {
     if (!Object.prototype.hasOwnProperty.call(value, key)) return;
-    const raw = value[key];
-    if (typeof raw === "number") {
-      metadata[key] = Number.isFinite(raw) ? raw : null;
-    } else if (typeof raw === "boolean") {
-      metadata[key] = raw;
-    } else {
-      metadata[key] = safeText(raw, 48);
-    }
+    metadata[key] = sanitizeMetadataValue(value[key]);
   });
   return metadata;
 }
@@ -168,7 +198,7 @@ function getUsageKv(env) {
 
 async function parseUsageRequest(request) {
   const contentLength = Number(request.headers.get("content-length") || 0);
-  if (Number.isFinite(contentLength) && contentLength > 4096) return null;
+  if (Number.isFinite(contentLength) && contentLength > 16384) return null;
 
   let payload = null;
   try {

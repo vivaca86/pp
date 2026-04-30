@@ -227,10 +227,18 @@
                 console.warn("update-tickers timed out; continuing with background verification", error);
               }
 
+              if (typeof trackDashboardSearch === "function") {
+                trackDashboardSearch(codes, targetDate, true, { reason: "save-tickers" });
+              }
               startBackgroundDashboardRefresh(codes, targetDate);
               scheduleUnlock();
               return { ok: true, pendingRefresh: true };
             } catch (error) {
+              if (typeof trackDashboardSearch === "function") {
+                trackDashboardSearch(codes, targetDate, false, {
+                  reason: String(error?.code || error?.message || "save-tickers-failed").slice(0, 48)
+                });
+              }
               state.editableSlots = previousEditableSlots;
               throw error;
             }

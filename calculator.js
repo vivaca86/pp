@@ -108,6 +108,34 @@
         };
       };
 
+      const roundLogNumber = (value, digits = 4) => {
+        if (!Number.isFinite(value)) return null;
+        return Number(value.toFixed(digits));
+      };
+
+      const buildCalculatorLogMetadata = (cardIndex, field, computation) => {
+        const metadata = {
+          cardIndex,
+          field,
+          state: computation.state
+        };
+
+        if (computation.state !== "ready") return metadata;
+
+        return {
+          ...metadata,
+          high: roundLogNumber(computation.high, 2),
+          low: roundLogNumber(computation.low, 2),
+          spread: roundLogNumber(computation.spread, 2),
+          spreadRatePct: roundLogNumber((computation.spreadRate || 0) * 100, 2),
+          levels: computation.levels.map((level) => ({
+            label: level.label,
+            price: roundLogNumber(level.price, 2),
+            ratePct: roundLogNumber((level.rate || 0) * 100, 2)
+          }))
+        };
+      };
+
       const getHelperState = (computation) => {
         switch (computation.state) {
           case "empty":
@@ -221,18 +249,16 @@
             calculatorState.cards[cardIndex][field] = target.value;
             persistCalculatorCards();
             const cardElement = target.closest("[data-calc-card]");
+            const computation = computeCard(calculatorState.cards[cardIndex]);
             if (cardElement) {
-              renderCardOutputs(cardElement, computeCard(calculatorState.cards[cardIndex]));
+              renderCardOutputs(cardElement, computation);
             }
             window.PPUsageLogger?.trackDebounced?.(
               `calculator-input-${cardIndex}`,
               "calculator_input",
               {
                 view: "calculator",
-                metadata: {
-                  cardIndex,
-                  field
-                }
+                metadata: buildCalculatorLogMetadata(cardIndex, field, computation)
               }
             );
           });

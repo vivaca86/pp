@@ -408,6 +408,66 @@
       return labels[event] || event || "-";
     }
 
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatNumber(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "-";
+      return new Intl.NumberFormat("ko-KR", {
+        maximumFractionDigits: 2
+      }).format(number);
+    }
+
+    function formatStockList(stocks = []) {
+      if (!Array.isArray(stocks) || !stocks.length) return "";
+      return stocks.slice(0, 6).map((stock) => {
+        const name = stock.name || stock.code || "-";
+        const rate = Number.isFinite(Number(stock.equalRatePct))
+          ? ` ${Number(stock.equalRatePct) > 0 ? "+" : ""}${formatNumber(stock.equalRatePct)}%`
+          : "";
+        return `${name}${stock.code ? `(${stock.code})` : ""}${rate}`;
+      }).join(" · ");
+    }
+
+    function formatLevelList(levels = []) {
+      if (!Array.isArray(levels) || !levels.length) return "";
+      return levels.map((level) => (
+        `${level.label || "-"} ${formatNumber(level.price)}원`
+      )).join(" · ");
+    }
+
+    function formatMetadataDetail(event) {
+      const metadata = event.metadata || {};
+      if (event.event === "calculator_input") {
+        if (metadata.state !== "ready") return `계산 상태: ${metadata.state || "-"}`;
+        return [
+          `고가 ${formatNumber(metadata.high)}`,
+          `저가 ${formatNumber(metadata.low)}`,
+          `차이 ${formatNumber(metadata.spread)}`,
+          formatLevelList(metadata.levels)
+        ].filter(Boolean).join(" · ");
+      }
+      if (event.event === "dashboard_load" || event.event === "dashboard_search") {
+        return formatStockList(metadata.searchedStocks);
+      }
+      if (event.event === "recommendation_run") {
+        return [
+          metadata.universe,
+          metadata.periodMonths ? `${metadata.periodMonths}개월` : "",
+          metadata.level ? `${Number(metadata.level) * 100}%` : "",
+          metadata.resultCount !== undefined ? `결과 ${metadata.resultCount}개` : ""
+        ].filter(Boolean).join(" · ");
+      }
+      return "";
+    }
+
     function iconFor(event) {
       if (event?.startsWith("calculator")) return "계";
       if (event?.startsWith("dashboard")) return "등";
@@ -437,7 +497,8 @@
       ]));
       elements.dashboardMetric.textContent = String(sumEvents(today, [
         "dashboard_view",
-        "dashboard_load"
+        "dashboard_load",
+        "dashboard_search"
       ]));
       elements.recommendation.textContent = String(sumEvents(today, [
         "recommendation_view",
@@ -463,16 +524,20 @@
 
     function renderEvents(payload) {
       const events = Array.isArray(payload.events) ? payload.events : [];
-      elements.eventList.innerHTML = events.map((event) => `
-        <article class="event-row">
-          <div class="event-icon">${iconFor(event.event)}</div>
-          <div class="event-main">
-            <strong>${labelFor(event.event, payload.labels)}</strong>
-            <span>${event.selectedDate || event.day || "-"} · ${event.success === false ? "실패" : "정상"}</span>
-          </div>
-          <div class="event-time">${formatDateTime(event.createdAt)}</div>
-        </article>
-      `).join("") || '<div class="empty">최근 로그가 없습니다.</div>';
+      elements.eventList.innerHTML = events.map((event) => {
+        const detail = formatMetadataDetail(event);
+        return `
+          <article class="event-row">
+            <div class="event-icon">${escapeHtml(iconFor(event.event))}</div>
+            <div class="event-main">
+              <strong>${escapeHtml(labelFor(event.event, payload.labels))}</strong>
+              <span>${escapeHtml(event.selectedDate || event.day || "-")} · ${event.success === false ? "실패" : "정상"}</span>
+              ${detail ? `<span>${escapeHtml(detail)}</span>` : ""}
+            </div>
+            <div class="event-time">${escapeHtml(formatDateTime(event.createdAt))}</div>
+          </article>
+        `;
+      }).join("") || '<div class="empty">최근 로그가 없습니다.</div>';
     }
 
     async function loadLogs() {
