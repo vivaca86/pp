@@ -262,13 +262,7 @@ async function storeUsageEvent(env, event) {
   ]);
 }
 
-async function recordUsageRequest(request, env) {
-  const event = await parseUsageRequest(request);
-  if (!event) return;
-  await storeUsageEvent(env, event);
-}
-
-function serveUsageLog(request, env, ctx) {
+async function serveUsageLog(request, env, ctx) {
   if (request.method !== "POST") {
     return jsonResponse({
       ok: false,
@@ -279,10 +273,17 @@ function serveUsageLog(request, env, ctx) {
     });
   }
 
-  const task = recordUsageRequest(request, env).catch((error) => {
-    console.warn("usage log write failed", error);
-  });
-  if (ctx?.waitUntil) ctx.waitUntil(task);
+  const event = await parseUsageRequest(request);
+  if (event) {
+    const task = storeUsageEvent(env, event).catch((error) => {
+      console.warn("usage log write failed", error);
+    });
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(task);
+    } else {
+      await task;
+    }
+  }
 
   return emptyResponse(204);
 }
