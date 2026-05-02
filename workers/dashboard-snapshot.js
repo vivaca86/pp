@@ -2,11 +2,13 @@ const DEFAULT_SNAPSHOT_KEY = "dashboard-latest.json";
 const DEFAULT_FALLBACK_SNAPSHOT_URL = "https://vivaca86.github.io/pp/dashboard-latest.json";
 const DEFAULT_USAGE_LOG_RETENTION_DAYS = 90;
 const DEFAULT_USAGE_RECENT_LIMIT = 100;
-const DEFAULT_SERIES_CACHE_TTL_SECONDS = 6 * 60 * 60;
+const DEFAULT_SERIES_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const EDITABLE_TICKER_COUNT = 6;
 const SERIES_CACHE_VERSION = "v1";
 const SERIES_MISS_FALLBACK_THRESHOLD = 3;
 const SERIES_FULL_RACE_DELAY_MS = 100;
+const APPS_SCRIPT_DASHBOARD_TIMEOUT_MS = 30000;
+const APPS_SCRIPT_SERIES_TIMEOUT_MS = 12000;
 const KRX_FIXED_MARKET_CLOSURE_MMDD = new Set(["05-01", "12-31"]);
 const KRX_KNOWN_MARKET_CLOSURES = new Set([
   "2026-05-01"
@@ -433,7 +435,7 @@ async function fetchDashboardPayloadFromAppsScript(env, date, tickers) {
     tickers: tickers.join(",")
   });
   if (!url) throw new Error("APPS_SCRIPT_GATEWAY_URL is not configured.");
-  return fetchJsonWithTimeout(url, 16000);
+  return fetchJsonWithTimeout(url, APPS_SCRIPT_DASHBOARD_TIMEOUT_MS);
 }
 
 async function fetchSeriesRecordFromAppsScript(env, date, target) {
@@ -447,7 +449,7 @@ async function fetchSeriesRecordFromAppsScript(env, date, target) {
     market: target.editable ? target.market : ""
   });
   if (!url) throw new Error("APPS_SCRIPT_GATEWAY_URL is not configured.");
-  const payload = await fetchJsonWithTimeout(url, 12000);
+  const payload = await fetchJsonWithTimeout(url, APPS_SCRIPT_SERIES_TIMEOUT_MS);
   return normalizeSeriesRecord(payload, target, safeDate(payload.selectedDate) || resolveKrxTradingDate(date) || date);
 }
 

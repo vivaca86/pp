@@ -10,7 +10,7 @@
     "FALLBACK_SNAPSHOT_URL": "https://vivaca86.github.io/pp/dashboard-latest.json",
     "USAGE_LOG_RETENTION_DAYS": "90",
     "APPS_SCRIPT_GATEWAY_URL": "https://script.google.com/macros/s/AKfycbyYgDJ7bRTsIOyVLsYnb53iamKyoAo3vE91OGF8emW9A8cf1veYu1GexN9MDvj-ZQm2jQ/exec",
-    "SERIES_CACHE_TTL_SECONDS": "21600"
+    "SERIES_CACHE_TTL_SECONDS": "604800"
   },
   "kv_namespaces": [
     {

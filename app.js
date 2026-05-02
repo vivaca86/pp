@@ -1176,7 +1176,7 @@ async function requestDashboardApiV2(date, tickers) {
   if (!url) return null;
 
   const controller = typeof AbortController === "function" ? new AbortController() : null;
-  const timeoutId = controller ? window.setTimeout(() => controller.abort(), 18000) : 0;
+  const timeoutId = controller ? window.setTimeout(() => controller.abort(), 45000) : 0;
 
   try {
     const response = await fetch(url, {
@@ -1186,12 +1186,29 @@ async function requestDashboardApiV2(date, tickers) {
     });
     const payload = await response.json();
     if (!response.ok || !payload?.ok || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) {
-      throw new Error(payload?.message || payload?.error?.message || "Worker dashboard API failed.");
+      const error = new Error(payload?.message || payload?.error?.message || "Worker dashboard API failed.");
+      error.status = response.status;
+      error.code = payload?.error?.code || payload?.error || "";
+      error.payload = payload;
+      if (error.code === "dashboard_api_v2_failed") {
+        error.skipDashboardFallback = true;
+      }
+      throw error;
     }
     return payload;
   } finally {
     if (timeoutId) window.clearTimeout(timeoutId);
   }
+}
+
+function shouldFallbackAfterWorkerDashboardError(error) {
+  if (!error) return true;
+  if (error.skipDashboardFallback) return false;
+  const message = String(error.message || "").toLowerCase();
+  const code = String(error.code || "").toLowerCase();
+  if (code === "dashboard_api_v2_failed") return false;
+  if (message.includes("operation was aborted")) return false;
+  return true;
 }
 
 function readCachedDashboardPayload(date) {
@@ -2864,6 +2881,7 @@ async function loadDashboardPayloadFromApi(date, options = {}) {
       if (workerPayload) return workerPayload;
     } catch (error) {
       console.warn("worker dashboard api v2 failed, fallback to server api", error);
+      if (!shouldFallbackAfterWorkerDashboardError(error)) throw error;
     }
   }
 
@@ -2962,6 +2980,7 @@ async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
   try {
     return await loadDashboardPayloadFromApi(date);
   } catch (error) {
+    if (!shouldFallbackAfterWorkerDashboardError(error)) throw error;
     console.warn("api dashboard source failed, fallback to sheet", error);
     setStatus("API 조회에 실패해 스프레드시트 방식으로 전환합니다...", "loading");
     return loadDashboardPayloadFromSheetWithRetry(date, maxAttempts);
