@@ -19,6 +19,7 @@
       );
 
       let pendingRefreshToken = 0;
+      const ENABLE_LEGACY_SAVE_PATCHES = false;
 
       const cloneEditableSlots = () => state.editableSlots.map((slot) => ({
         id: slot.id,
@@ -171,7 +172,7 @@
           };
         }
 
-        if (typeof loadDashboardPayloadWithRetry === "function") {
+        if (ENABLE_LEGACY_SAVE_PATCHES && typeof loadDashboardPayloadWithRetry === "function") {
           loadDashboardPayloadWithRetry = async function (date, maxAttempts = 3) {
             if (typeof loadDashboardPayloadFromStaticSnapshot === "function") {
               const staticPayload = await loadDashboardPayloadFromStaticSnapshot(date);
@@ -192,7 +193,7 @@
           };
         }
 
-        if (typeof saveTickerCodes === "function") {
+        if (ENABLE_LEGACY_SAVE_PATCHES && typeof saveTickerCodes === "function") {
           saveTickerCodes = async function (codes) {
             const targetDate = elements.dateInput.value || state.selectedDate || getTodayKstDate();
             const previousEditableSlots = cloneEditableSlots();
@@ -238,7 +239,7 @@
           };
         }
 
-        if (typeof saveTickers === "function") {
+        if (ENABLE_LEGACY_SAVE_PATCHES && typeof saveTickers === "function") {
           saveTickers = async function () {
             const composingInput = document.querySelector('.slot-input[data-editable="true"][data-composing="true"]');
             if (composingInput) {
