@@ -1442,12 +1442,12 @@ async function saveTickerCodes(codes) {
   const targetDate = elements.dateInput.value || state.selectedDate || getTodayKstDate();
   const requestedCodes = codes.map((code) => normalizeTicker(code));
   clearCachedDashboardPayload();
+  trackDashboardSearch(requestedCodes, targetDate, true, { reason: "search-submit" });
   await requestGateway({
     action: "update-tickers",
     tickers: codes.join(","),
     date: targetDate
   });
-  trackDashboardSearch(requestedCodes, targetDate, true);
   syncEditableSlotsFromCodes(requestedCodes);
   setStatus("\uc885\ubaa9 \uc800\uc7a5 \uc644\ub8cc. \uc6d4\uac04\ud45c \uac31\uc2e0 \uc911...", "loading");
 
