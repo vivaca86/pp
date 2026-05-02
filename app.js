@@ -4,7 +4,9 @@ const STORAGE_LAST_DATE = "stock_lab_selected_date";
 const STORAGE_ACTIVE_VIEW = "stock_lab_active_view";
 const STORAGE_DASHBOARD_SOURCE_MODE = "stock_lab_dashboard_source_mode";
 const STORAGE_DASHBOARD_PAYLOAD = "stock_lab_dashboard_payload_v1";
+const STORAGE_STOCK_CATALOG = "stock_lab_stock_catalog_v1";
 const DASHBOARD_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const STOCK_CATALOG_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const RECOMMENDATION_GATEWAY_COOLDOWN_MS = 8000;
 const RECOMMENDATION_RUN_COOLDOWN_MS = 12000;
 const RECOMMENDATION_WARMUP_MAX_PERIOD_MONTHS = 12;
@@ -43,7 +45,8 @@ const recommendationWarmupState = {
   pending: new Map()
 };
 let recommendationCooldownTimer = 0;
-let catalogLoadStarted = false;
+let catalogLoadPromise = null;
+let catalogLoaded = false;
 
 const KOSPI_BENCHMARK = {
   code: "0001",
@@ -1003,13 +1006,34 @@ function enrichStockMeta(stock) {
   };
 }
 
+function prepareCatalogItem(stock) {
+  return {
+    ...stock,
+    _tickerKey: normalizeTicker(stock.code),
+    _codeKey: normalizeSearchText(stock.code),
+    _nameKey: normalizeSearchText(stock.name)
+  };
+}
+
 function mergeCatalogs(remoteItems, localItems) {
   const merged = new Map();
   [...localItems, ...(Array.isArray(remoteItems) ? remoteItems : [])].forEach((item) => {
     const stock = enrichStockMeta(item);
-    if (stock?.code) merged.set(stock.code, stock);
+    if (stock?.code) merged.set(stock.code, prepareCatalogItem(stock));
   });
   return [...merged.values()].sort((left, right) => left.name.localeCompare(right.name, "ko"));
+}
+
+function getCatalogTickerKey(item) {
+  return item?._tickerKey || normalizeTicker(item?.code);
+}
+
+function getCatalogCodeKey(item) {
+  return item?._codeKey || normalizeSearchText(item?.code);
+}
+
+function getCatalogNameKey(item) {
+  return item?._nameKey || normalizeSearchText(item?.name);
 }
 
 function getTickerSuggestions(query = "") {
@@ -1026,18 +1050,21 @@ function getTickerSuggestions(query = "") {
   const seen = new Set();
 
   const scoreItem = (item) => {
-    const code = normalizeTicker(item.code);
-    const name = normalizeSearchText(item.name);
-    if (code === normalizedTicker || name === normalizedText) return 1000;
-    if (normalizedTicker && code.startsWith(normalizedTicker)) return 800;
+    const tickerKey = getCatalogTickerKey(item);
+    const codeKey = getCatalogCodeKey(item);
+    const name = getCatalogNameKey(item);
+    if (tickerKey === normalizedTicker || codeKey === normalizedText || name === normalizedText) return 1000;
+    if (normalizedTicker && tickerKey.startsWith(normalizedTicker)) return 800;
+    if (normalizedText && codeKey.startsWith(normalizedText)) return 780;
     if (normalizedText && name.startsWith(normalizedText)) return 760;
     if (normalizedText && name.includes(normalizedText)) return 620;
-    if (normalizedTicker && code.includes(normalizedTicker)) return 560;
+    if (normalizedTicker && tickerKey.includes(normalizedTicker)) return 560;
+    if (normalizedText && codeKey.includes(normalizedText)) return 540;
     return 0;
   };
 
   state.catalog.forEach((item) => {
-    const code = normalizeTicker(item.code);
+    const code = getCatalogTickerKey(item);
     if (!code || seen.has(code)) return;
     const score = scoreItem(item);
     if (!score) return;
@@ -1171,32 +1198,107 @@ function getSeriesCacheKey(target, selectedDate) {
   return `${target.assetType}:${target.code}:${selectedDate}`;
 }
 
+function normalizeCatalogCacheItem(item) {
+  const stock = enrichStockMeta(item);
+  if (!stock?.code || !stock.name) return null;
+  return {
+    code: normalizeTicker(stock.code),
+    name: String(stock.name || "").trim(),
+    market: String(stock.market || "").trim().toUpperCase(),
+    assetType: String(stock.assetType || "stock").trim()
+  };
+}
+
+function readCachedStockCatalog() {
+  try {
+    const record = JSON.parse(localStorage.getItem(STORAGE_STOCK_CATALOG) || "null");
+    if (!record || !Array.isArray(record.items)) return null;
+    const savedAt = Number(record.savedAt || 0);
+    if (!savedAt || Date.now() - savedAt > STOCK_CATALOG_CACHE_MAX_AGE_MS) return null;
+    return record.items.map(normalizeCatalogCacheItem).filter(Boolean);
+  } catch (error) {
+    console.warn("catalog cache read skipped", error);
+    return null;
+  }
+}
+
+function saveCachedStockCatalog(items) {
+  if (!Array.isArray(items) || !items.length) return;
+
+  try {
+    const normalizedItems = items
+      .map(normalizeCatalogCacheItem)
+      .filter(Boolean)
+      .slice(0, 6000);
+    if (!normalizedItems.length) return;
+    localStorage.setItem(STORAGE_STOCK_CATALOG, JSON.stringify({
+      savedAt: Date.now(),
+      items: normalizedItems
+    }));
+  } catch (error) {
+    console.warn("catalog cache save skipped", error);
+  }
+}
+
+function hydrateCachedCatalog() {
+  const cachedItems = readCachedStockCatalog();
+  if (!cachedItems) return false;
+  state.catalog = mergeCatalogs(cachedItems, LOCAL_STOCK_CATALOG);
+  catalogLoaded = true;
+  buildTickerDatalist();
+  return true;
+}
+
 async function loadCatalog() {
   if (!state.gatewayUrl) {
     state.catalog = mergeCatalogs([], LOCAL_STOCK_CATALOG);
+    catalogLoaded = true;
     buildTickerDatalist();
-    return;
+    return state.catalog;
   }
 
   try {
     const payload = await requestGateway({ action: "stock-catalog", market: "ALL" });
-    state.catalog = mergeCatalogs(payload.items, LOCAL_STOCK_CATALOG);
+    const remoteItems = Array.isArray(payload?.items) ? payload.items : [];
+    if (!remoteItems.length && hydrateCachedCatalog()) {
+      return state.catalog;
+    }
+    state.catalog = mergeCatalogs(remoteItems, LOCAL_STOCK_CATALOG);
+    saveCachedStockCatalog(remoteItems);
   } catch (error) {
     console.warn("catalog fallback", error);
-    state.catalog = mergeCatalogs([], LOCAL_STOCK_CATALOG);
+    if (!hydrateCachedCatalog()) {
+      state.catalog = mergeCatalogs([], LOCAL_STOCK_CATALOG);
+      buildTickerDatalist();
+    }
+    catalogLoaded = true;
+    return state.catalog;
   }
 
+  catalogLoaded = true;
   buildTickerDatalist();
+  return state.catalog;
 }
 
-function scheduleCatalogLoad() {
-  if (catalogLoadStarted) return;
-  catalogLoadStarted = true;
-  window.setTimeout(() => {
-    loadCatalog().catch((error) => {
+function scheduleCatalogLoad(options = {}) {
+  const force = Boolean(options.force);
+  const delayMs = Math.max(0, Number(options.delayMs || 0));
+  if (catalogLoaded && !force) return Promise.resolve(state.catalog);
+  if (catalogLoadPromise && !force) return catalogLoadPromise;
+
+  catalogLoadPromise = new Promise((resolve) => {
+    window.setTimeout(resolve, delayMs);
+  })
+    .then(() => loadCatalog())
+    .catch((error) => {
       console.warn("catalog background load", error);
+      return state.catalog;
+    })
+    .finally(() => {
+      catalogLoadPromise = null;
     });
-  }, 0);
+
+  return catalogLoadPromise;
 }
 
 function isStaticDashboardPayload(payload) {
@@ -1241,8 +1343,9 @@ function findCatalogItem(rawValue) {
   let bestMatch = null;
 
   state.catalog.forEach((item) => {
-    const code = normalizeTicker(item.code);
-    const name = normalizeSearchText(item.name);
+    const code = getCatalogTickerKey(item);
+    const codeKey = getCatalogCodeKey(item);
+    const name = getCatalogNameKey(item);
     const assetType = String(item.assetType || "").trim().toLowerCase();
     let score = 0;
 
@@ -1250,13 +1353,13 @@ function findCatalogItem(rawValue) {
       score = 1000;
     } else if (name === normalizedText) {
       score = 900;
-    } else if (normalizedText && code.startsWith(normalizedText)) {
+    } else if (normalizedText && codeKey.startsWith(normalizedText)) {
       score = 720;
     } else if (normalizedText && name.startsWith(normalizedText)) {
       score = 680;
     } else if (normalizedText && name.endsWith(normalizedText)) {
       score = 640;
-    } else if (normalizedText && (name.includes(normalizedText) || code.includes(normalizedText))) {
+    } else if (normalizedText && (name.includes(normalizedText) || codeKey.includes(normalizedText))) {
       score = 520;
     }
 
@@ -1280,8 +1383,8 @@ async function resolveStockInput(rawValue) {
   if (!needle) return null;
 
   const fuzzy = state.catalog.find((item) => {
-    const codeKey = normalizeSearchText(item.code);
-    const nameKey = normalizeSearchText(item.name);
+    const codeKey = getCatalogCodeKey(item);
+    const nameKey = getCatalogNameKey(item);
     return codeKey.includes(needle) || nameKey.includes(needle);
   });
 
@@ -1305,8 +1408,8 @@ function resolveTickerCode(rawValue) {
 
   const needle = normalizeSearchText(raw);
   const fuzzy = state.catalog.find((item) => {
-    const codeKey = normalizeSearchText(item.code);
-    const nameKey = normalizeSearchText(item.name);
+    const codeKey = getCatalogCodeKey(item);
+    const nameKey = getCatalogNameKey(item);
     return codeKey.includes(needle) || nameKey.includes(needle);
   });
   if (fuzzy) return normalizeTicker(fuzzy.code);
@@ -1314,16 +1417,33 @@ function resolveTickerCode(rawValue) {
   return raw;
 }
 
+function isResolvedTickerValue(resolvedValue, rawValue) {
+  return (
+    normalizeTicker(resolvedValue) !== normalizeTicker(rawValue)
+    || /^[A-Z0-9]{6,9}$/.test(normalizeTicker(resolvedValue))
+  );
+}
+
 async function resolveTickerCodeForSave(rawValue) {
   const raw = String(rawValue || "").trim();
   if (!raw) return "";
 
   const localResolved = resolveTickerCode(raw);
-  if (normalizeTicker(localResolved) !== normalizeTicker(raw) || /^[A-Z0-9]{6,9}$/.test(normalizeTicker(localResolved))) {
+  if (isResolvedTickerValue(localResolved, raw)) {
     return localResolved;
   }
 
   if (!state.gatewayUrl) return localResolved;
+
+  if (!catalogLoaded) {
+    const catalogResolved = await Promise.race([
+      scheduleCatalogLoad().then(() => resolveTickerCode(raw)).catch(() => ""),
+      new Promise((resolve) => window.setTimeout(() => resolve(""), 800))
+    ]);
+    if (isResolvedTickerValue(catalogResolved, raw)) {
+      return catalogResolved;
+    }
+  }
 
   try {
     const payload = await requestGateway({ action: "stock-search", q: raw });
@@ -2970,6 +3090,7 @@ function restoreState() {
 async function bootstrap() {
   ensureGatewayCard();
   restoreState();
+  const catalogHydrated = hydrateCachedCatalog();
   applyStaticUiText();
   bindEvents();
   setActiveView(state.activeView, { persist: false });
@@ -2979,6 +3100,7 @@ async function bootstrap() {
   setRecommendationSummaryVisibility("");
   renderSlots(getAllSlots());
   buildTickerDatalist();
+  scheduleCatalogLoad({ delayMs: catalogHydrated ? 0 : 600 });
 
   try {
     if (state.activeView === "calculator") {
