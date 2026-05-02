@@ -359,7 +359,7 @@
     </section>
   </main>
 
-  <script src="./config.js?v=20260502b"></script>
+  <script src="./config.js?v=20260502c"></script>
   <script>
     const config = window.PP_CONFIG || {};
     const elements = {
@@ -425,6 +425,22 @@
       }).format(number);
     }
 
+    function formatDurationMs(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "";
+      if (number >= 1000) return `${formatNumber(number / 1000)}초`;
+      return `${Math.round(number)}ms`;
+    }
+
+    function formatDashboardCache(metadata = {}) {
+      if (metadata.cacheHits === null || metadata.cacheHits === undefined) return "";
+      const parts = [
+        `캐시 ${metadata.cacheHits}/${Number(metadata.cacheHits || 0) + Number(metadata.cacheMisses || 0)}`
+      ];
+      if (metadata.fallback) parts.push(`fallback${metadata.fallbackReason ? `:${metadata.fallbackReason}` : ""}`);
+      return parts.join(" · ");
+    }
+
     function formatStockList(stocks = []) {
       if (!Array.isArray(stocks) || !stocks.length) return "";
       return stocks.slice(0, 6).map((stock) => {
@@ -455,7 +471,12 @@
         ].filter(Boolean).join(" · ");
       }
       if (event.event === "dashboard_load" || event.event === "dashboard_search") {
-        return formatStockList(metadata.searchedStocks);
+        return [
+          formatStockList(metadata.searchedStocks),
+          metadata.source ? `소스 ${metadata.source}` : "",
+          formatDurationMs(event.durationMs),
+          formatDashboardCache(metadata)
+        ].filter(Boolean).join(" · ");
       }
       if (event.event === "recommendation_run") {
         return [

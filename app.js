@@ -478,17 +478,25 @@ function buildDashboardUsageMetadata(payload, source) {
   const rows = Array.isArray(payload?.rows) ? payload.rows : [];
   const row = rows.find((item) => item.date === selectedDate) || rows[rows.length - 1] || null;
   const slots = Array.isArray(payload?.slots) ? payload.slots : [];
+  const workerCache = payload?.workerSeriesCache && typeof payload.workerSeriesCache === "object"
+    ? payload.workerSeriesCache
+    : null;
   const searchedStocks = slots
     .map((slot, index) => ({ slot, cell: row?.values?.[index] || null }))
     .filter(({ slot }) => slot?.editable && (slot.code || slot.name || slot.stock?.code))
     .map(({ slot, cell }) => buildUsageStockMeta(slot, cell));
 
   return {
-    source,
+    source: payload?.sourceMode || source,
     selectedDateRow: row?.date || "",
     slotCodes: searchedStocks.map((stock) => stock.code).filter(Boolean),
     slotNames: searchedStocks.map((stock) => stock.name).filter(Boolean),
-    searchedStocks
+    searchedStocks,
+    cacheHits: workerCache ? Number(workerCache.hits || 0) : null,
+    cacheMisses: workerCache ? Number(workerCache.misses || 0) : null,
+    fallback: workerCache ? Boolean(workerCache.fallback) : null,
+    fallbackReason: workerCache ? String(workerCache.fallbackReason || "") : "",
+    workerDurationMs: workerCache ? Number(workerCache.durationMs || 0) : null
   };
 }
 
@@ -511,11 +519,12 @@ function buildDashboardSearchMetadata(codes = []) {
   };
 }
 
-function trackDashboardSearch(codes, selectedDate, success = true, extraMetadata = {}) {
+function trackDashboardSearch(codes, selectedDate, success = true, extraMetadata = {}, durationMs = null) {
   trackUsage("dashboard_search", {
     view: "dashboard",
     selectedDate,
     success,
+    durationMs,
     metadata: {
       ...buildDashboardSearchMetadata(codes),
       ...extraMetadata
@@ -1637,10 +1646,10 @@ function attachSlotEvents() {
 }
 
 async function saveTickerCodes(codes) {
+  const usageStartedAt = markUsageStart();
   const targetDate = elements.dateInput.value || state.selectedDate || getTodayKstDate();
   const requestedCodes = codes.map((code) => normalizeTicker(code));
   clearCachedDashboardPayload();
-  trackDashboardSearch(requestedCodes, targetDate, true, { reason: "search-submit" });
   syncEditableSlotsFromCodes(requestedCodes);
   setStatus("\uc6d4\uac04\ud45c \uac31\uc2e0 \uc911...", "loading");
 
@@ -1653,9 +1662,6 @@ async function saveTickerCodes(codes) {
     date: targetDate
   }).then(() => ({ ok: true })).catch((error) => {
     console.warn("ticker save failed after dashboard refresh started", error);
-    trackDashboardSearch(requestedCodes, targetDate, false, {
-      reason: String(error?.code || error?.message || "save-tickers-failed").slice(0, 48)
-    });
     return { ok: false, error };
   });
 
@@ -1666,10 +1672,19 @@ async function saveTickerCodes(codes) {
       if (state.dashboardRefreshSeq !== refreshSeq) return;
       renderDashboard(payload, { cache: true });
       dashboardRendered = true;
+      trackDashboardSearch(requestedCodes, payload.selectedDate || targetDate, true, {
+        ...buildDashboardUsageMetadata(payload, payload.sourceMode || "api"),
+        requestedDate: targetDate,
+        reason: "search-submit"
+      }, usageDurationSince(usageStartedAt));
       setStatus("\uc6d4\uac04\ud45c \uac31\uc2e0 \uc644\ub8cc. \uc885\ubaa9 \uc800\uc7a5 \ud655\uc778 \uc911...", "success");
     } catch (error) {
       if (state.dashboardRefreshSeq !== refreshSeq) return;
       console.warn("dashboard refresh after save", error);
+      trackDashboardSearch(requestedCodes, targetDate, false, {
+        requestedDate: targetDate,
+        reason: String(error?.code || error?.message || "dashboard-refresh-failed").slice(0, 48)
+      }, usageDurationSince(usageStartedAt));
       setStatus("\uc885\ubaa9 \uc800\uc7a5 \uc911. \uc6d4\uac04\ud45c\ub294 \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uac31\uc2e0\ud574 \uc8fc\uc138\uc694.", "loading");
     }
 
