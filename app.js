@@ -8,6 +8,7 @@ const DASHBOARD_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const RECOMMENDATION_GATEWAY_COOLDOWN_MS = 8000;
 const RECOMMENDATION_RUN_COOLDOWN_MS = 12000;
 const RECOMMENDATION_WARMUP_MAX_PERIOD_MONTHS = 12;
+const TICKER_DATALIST_ITEM_LIMIT = 12;
 const APP_ERROR_CODES = {
   gatewayMissing: "PP-GATEWAY-MISSING",
   gatewayResponseParse: "PP-GATEWAY-PARSE",
@@ -1004,10 +1005,54 @@ function mergeCatalogs(remoteItems, localItems) {
   return [...merged.values()].sort((left, right) => left.name.localeCompare(right.name, "ko"));
 }
 
-function buildTickerDatalist() {
-  elements.tickerList.innerHTML = state.catalog.map((item) => (
-    `<option value="${escapeHtml(item.code)}">${escapeHtml(item.name)}</option>` +
-    `<option value="${escapeHtml(item.name)}">${escapeHtml(item.code)}</option>`
+function getTickerSuggestions(query = "") {
+  const raw = String(query || "").trim();
+  const normalizedText = normalizeSearchText(raw);
+  const normalizedTicker = normalizeTicker(raw);
+  const candidates = [];
+  const seen = new Set();
+
+  const scoreItem = (item) => {
+    const code = normalizeTicker(item.code);
+    const name = normalizeSearchText(item.name);
+    if (!raw) {
+      return QUICK_STOCK_CATALOG.some((stock) => normalizeTicker(stock.code) === code) ? 100 : 0;
+    }
+    if (code === normalizedTicker || name === normalizedText) return 1000;
+    if (normalizedTicker && code.startsWith(normalizedTicker)) return 800;
+    if (normalizedText && name.startsWith(normalizedText)) return 760;
+    if (normalizedText && name.includes(normalizedText)) return 620;
+    if (normalizedTicker && code.includes(normalizedTicker)) return 560;
+    return 0;
+  };
+
+  state.catalog.forEach((item) => {
+    const code = normalizeTicker(item.code);
+    if (!code || seen.has(code)) return;
+    const score = scoreItem(item);
+    if (!score) return;
+    seen.add(code);
+    candidates.push({ item, score });
+  });
+
+  return candidates
+    .sort((left, right) => (
+      right.score - left.score
+      || String(left.item.name || "").localeCompare(String(right.item.name || ""), "ko")
+    ))
+    .slice(0, TICKER_DATALIST_ITEM_LIMIT)
+    .map(({ item }) => item);
+}
+
+function buildTickerDatalist(query = null) {
+  const activeInput = document.activeElement;
+  const resolvedQuery = query === null && activeInput?.matches?.(".slot-input[data-editable='true']")
+    ? activeInput.value
+    : String(query || "");
+  const suggestions = getTickerSuggestions(resolvedQuery);
+  elements.tickerList.innerHTML = suggestions.map((item) => (
+    `<option value="${escapeHtml(item.name)}">${escapeHtml(item.code)}</option>` +
+    `<option value="${escapeHtml(item.code)}">${escapeHtml(item.name)}</option>`
   )).join("");
 }
 
@@ -1334,6 +1379,16 @@ function attachSlotEvents() {
   document.querySelectorAll(".slot-card").forEach((card) => {
     const input = card.querySelector(".slot-input");
     if (!input || input.dataset.editable !== "true") return;
+    let saveTimer = 0;
+    const requestSave = () => {
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => {
+        saveTickers().catch((error) => {
+          console.error(error);
+          setStatus(error.message, "error");
+        });
+      }, 250);
+    };
 
     input.addEventListener("compositionstart", () => {
       input.dataset.composing = "true";
@@ -1341,16 +1396,21 @@ function attachSlotEvents() {
     input.addEventListener("compositionend", () => {
       input.dataset.composing = "false";
       updateSlotPreview(card);
+      buildTickerDatalist(input.value);
     });
-    input.addEventListener("input", () => updateSlotPreview(card));
-    input.addEventListener("focus", () => scheduleCatalogLoad(), { once: true });
+    input.addEventListener("input", () => {
+      updateSlotPreview(card);
+      buildTickerDatalist(input.value);
+    });
+    input.addEventListener("focus", () => {
+      buildTickerDatalist(input.value);
+      scheduleCatalogLoad();
+    }, { once: true });
     input.addEventListener("change", (event) => {
       if (event.isComposing || input.dataset.composing === "true") return;
       updateSlotPreview(card);
-      saveTickers().catch((error) => {
-        console.error(error);
-        setStatus(error.message, "error");
-      });
+      buildTickerDatalist(input.value);
+      requestSave();
     });
     input.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
@@ -1360,6 +1420,7 @@ function attachSlotEvents() {
         return;
       }
       event.preventDefault();
+      window.clearTimeout(saveTimer);
       saveTickers().catch((error) => {
         console.error(error);
         setStatus(error.message, "error");
