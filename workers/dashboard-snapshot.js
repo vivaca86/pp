@@ -2,6 +2,10 @@ const DEFAULT_SNAPSHOT_KEY = "dashboard-latest.json";
 const DEFAULT_FALLBACK_SNAPSHOT_URL = "https://vivaca86.github.io/pp/dashboard-latest.json";
 const DEFAULT_USAGE_LOG_RETENTION_DAYS = 90;
 const DEFAULT_USAGE_RECENT_LIMIT = 100;
+const DEFAULT_SERIES_CACHE_TTL_SECONDS = 6 * 60 * 60;
+const EDITABLE_TICKER_COUNT = 6;
+const SERIES_CACHE_VERSION = "v1";
+const SERIES_MISS_FALLBACK_THRESHOLD = 3;
 const KRX_FIXED_MARKET_CLOSURE_MMDD = new Set(["05-01", "12-31"]);
 const KRX_KNOWN_MARKET_CLOSURES = new Set([
   "2026-05-01"
@@ -109,6 +113,11 @@ function isUsageEventsRoute(pathname) {
   return pathname === "/usage-events";
 }
 
+function isDashboardApiV2Route(pathname) {
+  return pathname === "/dashboard-api-v2"
+    || pathname === "/dashboard-data-api-v2";
+}
+
 function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
@@ -144,6 +153,15 @@ function safeText(value, maxLength = 80) {
 function safeDate(value) {
   const text = safeText(value, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+}
+
+function sanitizeStockCode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/^KRX:/, "")
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 9);
 }
 
 function safeMetadataKey(value) {
@@ -209,6 +227,451 @@ function sanitizeUsageMetadata(value) {
     metadata[key] = sanitizeMetadataValue(value[key]);
   });
   return metadata;
+}
+
+function getSeriesCacheTtlSeconds(env) {
+  return clampNumber(
+    env.SERIES_CACHE_TTL_SECONDS,
+    60,
+    7 * 24 * 60 * 60,
+    DEFAULT_SERIES_CACHE_TTL_SECONDS
+  );
+}
+
+function getAppsScriptGatewayUrl(env) {
+  return String(env.APPS_SCRIPT_GATEWAY_URL || "").trim();
+}
+
+function buildAppsScriptUrl(env, params) {
+  const gatewayUrl = getAppsScriptGatewayUrl(env);
+  if (!gatewayUrl) return "";
+  const url = new URL(gatewayUrl);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+  return url.toString();
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok) {
+      const message = payload?.error?.message || payload?.message || `Request failed (${response.status})`;
+      throw new Error(message);
+    }
+    return payload;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function parseDashboardTickers(rawValue) {
+  const tickers = String(rawValue || "")
+    .split(",")
+    .map(sanitizeStockCode);
+  if (tickers.length !== EDITABLE_TICKER_COUNT) return null;
+  return tickers;
+}
+
+function parseDelimitedText(rawValue, count, maxLength = 80) {
+  const items = String(rawValue || "")
+    .split(",")
+    .map((item) => safeText(item || "", maxLength));
+  while (items.length < count) items.push("");
+  return items.slice(0, count);
+}
+
+function buildDashboardTargets(tickers, names = [], markets = []) {
+  return [
+    {
+      cacheCode: "0001",
+      code: "0001",
+      displayCode: "KOSPI",
+      name: "KOSPI",
+      market: "KOSPI",
+      assetType: "index",
+      editable: false
+    },
+    {
+      cacheCode: "1001",
+      code: "1001",
+      displayCode: "KOSDAQ",
+      name: "KOSDAQ",
+      market: "KOSDAQ",
+      assetType: "index",
+      editable: false
+    },
+    ...tickers.map((code, index) => ({
+      cacheCode: code || `empty-${index + 1}`,
+      code,
+      displayCode: code,
+      name: names[index] || code || "Unknown",
+      market: markets[index] || "KRX",
+      assetType: "stock",
+      editable: true,
+      id: index + 1
+    }))
+  ];
+}
+
+function buildSeriesCacheKey(date, target) {
+  return [
+    "dashboard-series",
+    SERIES_CACHE_VERSION,
+    safeDate(date),
+    target.assetType,
+    sanitizeStockCode(target.cacheCode || target.code)
+  ].join(":");
+}
+
+async function readCachedSeries(env, key) {
+  if (!env.PP_DASHBOARD_SNAPSHOT?.get) return null;
+  try {
+    const record = await env.PP_DASHBOARD_SNAPSHOT.get(key, {
+      type: "json",
+      cacheTtl: 30
+    });
+    if (!record?.series?.slot || !Array.isArray(record.series.rows)) return null;
+    return record;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedSeries(env, key, record) {
+  if (!env.PP_DASHBOARD_SNAPSHOT?.put || !record?.series?.slot || !Array.isArray(record.series.rows)) return;
+  await env.PP_DASHBOARD_SNAPSHOT.put(key, JSON.stringify(record), {
+    expirationTtl: getSeriesCacheTtlSeconds(env)
+  });
+}
+
+function isFiniteNumber(value) {
+  return Number.isFinite(Number(value));
+}
+
+function roundNumber(value, digits = 8) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  const factor = 10 ** digits;
+  return Math.round(parsed * factor) / factor;
+}
+
+function formatHumanDate(dateIso) {
+  return safeDate(dateIso).replace(/-/g, ".");
+}
+
+function formatMonthDay(dateIso) {
+  const normalized = safeDate(dateIso);
+  return normalized ? normalized.slice(5) : "";
+}
+
+function formatPercent(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "-";
+  return `${parsed > 0 ? "+" : ""}${(parsed * 100).toFixed(2)}%`;
+}
+
+function normalizeSeriesRecord(record, target, selectedDate) {
+  const rows = Array.isArray(record?.series?.rows)
+    ? record.series.rows
+      .filter((row) => safeDate(row?.date))
+      .map((row) => ({
+        date: safeDate(row.date),
+        close: isFiniteNumber(row.close) ? Number(row.close) : null,
+        equalRate: isFiniteNumber(row.equalRate) ? Number(row.equalRate) : null
+      }))
+    : [];
+  const slot = {
+    ...(record?.series?.slot || {}),
+    code: record?.series?.slot?.code || target.displayCode || target.code,
+    name: record?.series?.slot?.name || target.name,
+    market: record?.series?.slot?.market || target.market,
+    assetType: record?.series?.slot?.assetType || target.assetType,
+    editable: Boolean(target.editable),
+    ...(target.editable ? { id: target.id } : {})
+  };
+
+  return {
+    ok: true,
+    selectedDate: safeDate(record?.selectedDate) || selectedDate,
+    selectedDateLabel: record?.selectedDateLabel || formatHumanDate(selectedDate),
+    selectedDateIsTradingDay: record?.selectedDateIsTradingDay !== false,
+    today: safeDate(record?.today) || getKstDay(),
+    marketHolidays: Array.isArray(record?.marketHolidays) ? record.marketHolidays.filter(safeDate) : [],
+    updatedAt: record?.updatedAt || new Date().toISOString(),
+    series: {
+      cacheCode: target.cacheCode,
+      assetType: target.assetType,
+      slot,
+      rows,
+      lastTradingDate: safeDate(record?.series?.lastTradingDate) || ""
+    }
+  };
+}
+
+async function fetchDashboardPayloadFromAppsScript(env, date, tickers) {
+  const url = buildAppsScriptUrl(env, {
+    action: "dashboard-data-api",
+    date,
+    tickers: tickers.join(",")
+  });
+  if (!url) throw new Error("APPS_SCRIPT_GATEWAY_URL is not configured.");
+  return fetchJsonWithTimeout(url, 16000);
+}
+
+async function fetchSeriesRecordFromAppsScript(env, date, target) {
+  const url = buildAppsScriptUrl(env, {
+    action: "dashboard-series-api",
+    date,
+    code: target.code,
+    assetType: target.assetType,
+    slotId: target.id || "",
+    name: target.editable ? target.name : "",
+    market: target.editable ? target.market : ""
+  });
+  if (!url) throw new Error("APPS_SCRIPT_GATEWAY_URL is not configured.");
+  const payload = await fetchJsonWithTimeout(url, 9000);
+  return normalizeSeriesRecord(payload, target, safeDate(payload.selectedDate) || resolveKrxTradingDate(date) || date);
+}
+
+function buildSeriesRecordsFromDashboardPayload(payload, targets) {
+  const selectedDate = safeDate(payload?.selectedDate) || "";
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const slots = Array.isArray(payload?.slots) ? payload.slots : [];
+
+  return targets.map((target, slotIndex) => {
+    const seriesRows = rows
+      .filter((row) => safeDate(row?.date))
+      .map((row) => {
+        const value = row.values && row.values[slotIndex] ? row.values[slotIndex].value : null;
+        return {
+          date: safeDate(row.date),
+          equalRate: isFiniteNumber(value) ? Number(value) : null
+        };
+      });
+    return normalizeSeriesRecord({
+      selectedDate,
+      selectedDateLabel: payload.selectedDateLabel,
+      selectedDateIsTradingDay: payload.selectedDateIsTradingDay,
+      today: payload.today,
+      marketHolidays: payload.marketHolidays,
+      updatedAt: payload.updatedAt,
+      series: {
+        slot: slots[slotIndex] || target,
+        rows: seriesRows,
+        lastTradingDate: payload.lastTradingDate
+      }
+    }, target, selectedDate);
+  });
+}
+
+function seedSeriesCacheFromDashboardPayload(env, payload, targets) {
+  const selectedDate = safeDate(payload?.selectedDate);
+  if (!selectedDate) return Promise.resolve();
+  const records = buildSeriesRecordsFromDashboardPayload(payload, targets);
+  return Promise.all(records.map((record, index) => (
+    writeCachedSeries(env, buildSeriesCacheKey(selectedDate, targets[index]), record)
+  )));
+}
+
+function withWorkerSeriesMetadata(payload, metadata) {
+  return {
+    ...payload,
+    sourceMode: "worker-series-cache",
+    apiComputed: true,
+    workerSeriesCache: metadata
+  };
+}
+
+function buildDashboardPayloadFromSeriesRecords(records, requestedDate, metrics) {
+  const selectedDate = safeDate(records.find((record) => safeDate(record.selectedDate))?.selectedDate)
+    || resolveKrxTradingDate(requestedDate)
+    || requestedDate;
+  const selectedMonth = selectedDate.slice(0, 7);
+  const dateSet = new Set();
+  const marketHolidaySet = new Set();
+
+  records.forEach((record) => {
+    (record.marketHolidays || []).forEach((day) => {
+      if (safeDate(day)) marketHolidaySet.add(day);
+    });
+    (record.series.rows || []).forEach((row) => {
+      const rowDate = safeDate(row.date);
+      if (rowDate && rowDate.slice(0, 7) === selectedMonth && rowDate <= selectedDate) {
+        dateSet.add(rowDate);
+      }
+    });
+  });
+
+  const dates = [...dateSet].sort();
+  const rowMaps = records.map((record) => {
+    const map = new Map();
+    (record.series.rows || []).forEach((row) => {
+      if (safeDate(row.date)) map.set(row.date, row);
+    });
+    return map;
+  });
+  const dashboardRows = dates.map((date) => ({
+    date,
+    displayDate: formatMonthDay(date),
+    values: rowMaps.map((map) => {
+      const item = map.get(date);
+      const value = item && isFiniteNumber(item.equalRate) ? roundNumber(item.equalRate, 8) : null;
+      return {
+        value,
+        display: isFiniteNumber(value) ? formatPercent(value) : "-"
+      };
+    })
+  }));
+  const slots = records.map((record, slotIndex) => {
+    const total = dashboardRows.reduce((sum, row) => {
+      const value = row.values[slotIndex]?.value;
+      return sum + (isFiniteNumber(value) ? Number(value) : 0);
+    }, 0);
+    return {
+      ...record.series.slot,
+      total: roundNumber(total, 8)
+    };
+  });
+  const lastTradingDate = dates.length ? dates[dates.length - 1] : selectedDate;
+
+  return {
+    ok: true,
+    service: "pp-dashboard-snapshot",
+    spreadsheetTitle: "worker-series-cache",
+    selectedDate,
+    selectedDateLabel: formatHumanDate(selectedDate),
+    selectedDateIsTradingDay: records.every((record) => record.selectedDateIsTradingDay !== false),
+    today: records.find((record) => safeDate(record.today))?.today || getKstDay(),
+    lastTradingDate,
+    lastTradingDateLabel: formatHumanDate(lastTradingDate),
+    tradingDateCount: dashboardRows.length,
+    marketHolidays: [...marketHolidaySet].sort(),
+    slots,
+    rows: dashboardRows,
+    updatedAt: new Date().toISOString(),
+    sourceMode: "worker-series-cache",
+    apiComputed: true,
+    workerSeriesCache: metrics
+  };
+}
+
+async function serveDashboardApiV2(request, env, ctx) {
+  const startedAt = Date.now();
+  const url = new URL(request.url);
+  const requestedDate = safeDate(url.searchParams.get("date")) || getKstDay();
+  const estimatedDate = resolveKrxTradingDate(requestedDate) || requestedDate;
+  const tickers = parseDashboardTickers(url.searchParams.get("tickers"));
+  const names = parseDelimitedText(url.searchParams.get("names"), EDITABLE_TICKER_COUNT);
+  const markets = parseDelimitedText(url.searchParams.get("markets"), EDITABLE_TICKER_COUNT, 16);
+
+  if (!tickers) {
+    return jsonResponse({
+      ok: false,
+      error: "invalid_tickers",
+      message: `tickers must contain ${EDITABLE_TICKER_COUNT} comma-separated values.`
+    }, {
+      status: 400,
+      headers: { "Cache-Control": "no-store" }
+    });
+  }
+
+  const targets = buildDashboardTargets(tickers, names, markets);
+  const metrics = {
+    requestedDate,
+    estimatedDate,
+    hits: 0,
+    misses: 0,
+    fallback: false,
+    fallbackReason: "",
+    durationMs: 0
+  };
+
+  const fallbackToFullPayload = async (reason) => {
+    metrics.fallback = true;
+    metrics.fallbackReason = reason;
+    const payload = await fetchDashboardPayloadFromAppsScript(env, requestedDate, tickers);
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(seedSeriesCacheFromDashboardPayload(env, payload, targets));
+    }
+    metrics.durationMs = Date.now() - startedAt;
+    return withWorkerSeriesMetadata(payload, metrics);
+  };
+
+  if (!env.PP_DASHBOARD_SNAPSHOT?.get || !env.PP_DASHBOARD_SNAPSHOT?.put) {
+    const payload = await fallbackToFullPayload("kv_missing");
+    return jsonResponse(payload, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  try {
+    const cacheKeys = targets.map((target) => buildSeriesCacheKey(estimatedDate, target));
+    const cachedRecords = await Promise.all(cacheKeys.map((key) => readCachedSeries(env, key)));
+    const records = new Array(targets.length);
+    const misses = [];
+
+    cachedRecords.forEach((record, index) => {
+      if (record) {
+        metrics.hits += 1;
+        records[index] = normalizeSeriesRecord(record, targets[index], estimatedDate);
+      } else {
+        metrics.misses += 1;
+        misses.push(index);
+      }
+    });
+
+    if (misses.length > SERIES_MISS_FALLBACK_THRESHOLD) {
+      const payload = await fallbackToFullPayload("too_many_misses");
+      return jsonResponse(payload, { headers: { "Cache-Control": "no-store" } });
+    }
+
+    await Promise.all(misses.map(async (index) => {
+      const target = targets[index];
+      const record = await fetchSeriesRecordFromAppsScript(env, requestedDate, target);
+      records[index] = record;
+      if (safeDate(record.selectedDate) === estimatedDate) {
+        await writeCachedSeries(env, cacheKeys[index], record);
+      } else if (safeDate(record.selectedDate)) {
+        await writeCachedSeries(env, buildSeriesCacheKey(record.selectedDate, target), record);
+      }
+    }));
+
+    const selectedDates = new Set(records.map((record) => safeDate(record?.selectedDate)).filter(Boolean));
+    if (selectedDates.size > 1) {
+      const payload = await fallbackToFullPayload("selected_date_mismatch");
+      return jsonResponse(payload, { headers: { "Cache-Control": "no-store" } });
+    }
+
+    metrics.durationMs = Date.now() - startedAt;
+    return jsonResponse(buildDashboardPayloadFromSeriesRecords(records, requestedDate, metrics), {
+      headers: {
+        "Cache-Control": "no-store"
+      }
+    });
+  } catch (error) {
+    try {
+      const payload = await fallbackToFullPayload(String(error?.message || "series_failed").slice(0, 80));
+      return jsonResponse(payload, { headers: { "Cache-Control": "no-store" } });
+    } catch (fallbackError) {
+      return jsonResponse({
+        ok: false,
+        error: "dashboard_api_v2_failed",
+        message: String(fallbackError?.message || error?.message || "Dashboard API v2 failed.")
+      }, {
+        status: 502,
+        headers: { "Cache-Control": "no-store" }
+      });
+    }
+  }
 }
 
 function createEmptyUsageSummary(day) {
@@ -627,6 +1090,10 @@ export default {
 
     if (isSnapshotRoute(url.pathname)) {
       return serveSnapshot(request, env);
+    }
+
+    if (isDashboardApiV2Route(url.pathname)) {
+      return serveDashboardApiV2(request, env, ctx);
     }
 
     if (isUsageSummaryRoute(url.pathname)) {

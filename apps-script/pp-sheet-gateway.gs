@@ -135,6 +135,8 @@ function routeGatewayAction_(action, params) {
       return handleDashboardData_(params);
     case 'dashboard-data-api':
       return handleDashboardDataApi_(params);
+    case 'dashboard-series-api':
+      return handleDashboardSeriesApi_(params);
     case 'dashboard-snapshot-status':
       return handleDashboardSnapshotStatus_(params);
     case 'dashboard-snapshot-refresh':
@@ -252,6 +254,83 @@ function handleDashboardDataApi_(params) {
   var payload = buildApiDashboardPayload_(requestedDate, tickerCodes);
   saveDashboardPayloadCache_(payload.selectedDate || requestedDate, tickerCodes, payload);
   return payload;
+}
+
+function handleDashboardSeriesApi_(params) {
+  var startedAt = Date.now();
+  var selectedDate = resolveKrxTradingDateLite_(params.date ? coerceIsoDate_(params.date) : todayIsoKst_());
+  var monthStart = startOfMonthIso_(selectedDate);
+  var marketHolidays = getKrxHolidayDatesLite_(selectedDate);
+  var boundaryHolidays = getBoundaryHolidayDatesLite_(selectedDate);
+  var historyEndDate = resolveSeriesEndDate_(selectedDate, boundaryHolidays);
+  var code = sanitizeStockCode_(params.code || params.ticker || '');
+  var assetType = String(params.assetType || params.kind || '').trim().toLowerCase();
+  var resolvedAssetType = (assetType === 'index' || code === '0001' || code === '1001') ? 'index' : 'stock';
+  var slotId = Math.max(0, Math.round(Number(params.slotId || 0)));
+  var fallbackName = String(params.name || '').trim();
+  var fallbackMarket = String(params.market || '').trim().toUpperCase();
+  var series;
+  var cacheCode = code;
+
+  if (resolvedAssetType === 'index') {
+    if (code === '1001') {
+      series = buildApiIndexDashboardSeries_('1001', 'KOSDAQ', '코스닥', 'KOSDAQ', selectedDate, historyEndDate, monthStart, boundaryHolidays);
+    } else {
+      cacheCode = '0001';
+      series = buildApiIndexDashboardSeries_('0001', 'KOSPI', '코스피', 'KOSPI', selectedDate, historyEndDate, monthStart, boundaryHolidays);
+    }
+  } else if (!code) {
+    series = buildApiDashboardSeriesFromRows_({
+      id: slotId,
+      editable: true,
+      code: '',
+      name: '종목명 확인 필요',
+      market: '',
+      assetType: 'stock'
+    }, [], selectedDate, monthStart, boundaryHolidays);
+  } else {
+    var catalogByCode = buildCachedStockCatalogLookup_();
+    if (fallbackName || fallbackMarket) {
+      catalogByCode[code] = {
+        code: code,
+        name: fallbackName || code,
+        market: fallbackMarket || 'KRX',
+        assetType: 'stock'
+      };
+    }
+    series = buildApiEquityDashboardSeries_(
+      code,
+      slotId,
+      selectedDate,
+      historyEndDate,
+      monthStart,
+      boundaryHolidays,
+      catalogByCode
+    );
+  }
+
+  return {
+    ok: true,
+    service: 'pp-sheet-gateway',
+    selectedDate: selectedDate,
+    selectedDateLabel: formatHumanDate_(selectedDate),
+    selectedDateIsTradingDay: !isKrxMarketClosedDate_(selectedDate, boundaryHolidays),
+    today: todayIsoKst_(),
+    marketHolidays: marketHolidays,
+    historyEndDate: historyEndDate,
+    cacheCode: cacheCode,
+    series: {
+      cacheCode: cacheCode,
+      assetType: resolvedAssetType,
+      slot: series.slot,
+      rows: series.rows,
+      lastTradingDate: series.lastTradingDate
+    },
+    updatedAt: formatKstTimestamp_(new Date()),
+    sourceMode: 'api-series',
+    apiComputed: true,
+    durationMs: Date.now() - startedAt
+  };
 }
 
 function buildApiDashboardPayload_(selectedDate, tickerCodes) {
