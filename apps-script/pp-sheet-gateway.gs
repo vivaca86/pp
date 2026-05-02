@@ -294,22 +294,22 @@ function handleDashboardSnapshotRefresh_(params) {
 
 function handleUpdateTickers_(params) {
   var context = openDashboardContext_();
-  var requestedDate = resolveKrxTradingDate_(params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet));
+  var requestedDate = resolveKrxTradingDateFast_(params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet));
   var requestedCodes = parseTickerList_(params.tickers);
   var waitForStablePayload = String(params.sync || '').trim().toLowerCase() === 'true';
   var resolvedCodes = requestedCodes.map(function (item) {
     return item ? resolveStock_(item).code : '';
   });
 
-  setTickerCodes_(context.controlSheet, resolvedCodes);
+  setTickerCodes_(context.controlSheet, resolvedCodes, waitForStablePayload);
   clearDashboardPayloadCache_(requestedDate, resolvedCodes);
-  clearLatestDashboardSnapshot_();
 
   if (requestedDate !== getSelectedDateIso_(context.controlSheet)) {
-    setSelectedDate_(context.controlSheet, requestedDate);
+    setSelectedDate_(context.controlSheet, requestedDate, waitForStablePayload);
   }
 
   if (waitForStablePayload) {
+    clearLatestDashboardSnapshot_();
     waitForDashboardRefresh_(context, requestedDate, resolvedCodes);
     var payload = buildStableDashboardPayload_(context);
     saveDashboardPayloadCache_(payload.selectedDate || requestedDate, resolvedCodes, payload);
@@ -657,17 +657,21 @@ function getSelectedDateIso_(controlSheet) {
   return coerceSheetDateToIso_(controlSheet.getRange('A3').getValue());
 }
 
-function setSelectedDate_(controlSheet, dateIso) {
+function setSelectedDate_(controlSheet, dateIso, shouldFlush) {
   controlSheet.getRange('A3').setValue(buildSheetDate_(dateIso));
-  SpreadsheetApp.flush();
+  if (shouldFlush !== false) {
+    SpreadsheetApp.flush();
+  }
 }
 
-function setTickerCodes_(controlSheet, codes) {
+function setTickerCodes_(controlSheet, codes, shouldFlush) {
   if (!Array.isArray(codes) || codes.length !== PP_SHEET_GATEWAY.editableTickerCount) {
     throw createHttpError_(400, '티커는 정확히 ' + PP_SHEET_GATEWAY.editableTickerCount + '개여야 합니다.');
   }
   controlSheet.getRange(PP_SHEET_GATEWAY.tickerRangeA1).setValues([codes]);
-  SpreadsheetApp.flush();
+  if (shouldFlush !== false) {
+    SpreadsheetApp.flush();
+  }
 }
 
 function waitForDashboardRefresh_(context, expectedDate, expectedCodes) {
@@ -2327,6 +2331,17 @@ function resolveKrxTradingDate_(dateIso) {
     }
 
     if (!arrayContains_(getBoundaryHolidayDates_(cursor), cursor)) {
+      return cursor;
+    }
+    cursor = addDaysIso_(cursor, -1);
+  }
+  return cursor;
+}
+
+function resolveKrxTradingDateFast_(dateIso) {
+  var cursor = coerceIsoDate_(dateIso);
+  for (var guard = 0; guard < 370; guard += 1) {
+    if (!isWeekendIso_(cursor) && !KRX_FIXED_MARKET_CLOSURE_MMDD[String(cursor).slice(5)]) {
       return cursor;
     }
     cursor = addDaysIso_(cursor, -1);

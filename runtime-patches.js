@@ -123,14 +123,14 @@
       const startBackgroundDashboardRefresh = (codes, targetDate) => {
         const refreshToken = ++pendingRefreshToken;
 
-        const refreshOnce = async (attempt = 1) => {
+        const refreshOnce = async () => {
           if (refreshToken !== pendingRefreshToken) return;
 
           try {
             const payload = await requestGatewayWithTimeout({
               action: "dashboard-data",
               date: targetDate
-            }, 25000);
+            }, 18000);
 
             if (!areTickersApplied(payload, codes)) {
               throw buildAppError(
@@ -145,26 +145,16 @@
             setStatus("지정한 종목으로 등가율 데이터를 갱신했습니다.", "success");
             scheduleUnlock();
           } catch (error) {
-            console.warn(`dashboard refresh after save attempt ${attempt}`, error);
+            console.warn("deferred dashboard refresh after save skipped", error);
             if (refreshToken !== pendingRefreshToken) return;
-
-            if (attempt >= 8) {
-              setStatus("종목 저장은 완료됐고 최신 값 반영이 지연되고 있습니다. 잠시 후 새로고침하면 표시됩니다.", "loading");
-              scheduleUnlock();
-              return;
-            }
-
-            setStatus("종목 저장 완료. 최신 등가율을 불러오는 중입니다...", "loading");
-            window.setTimeout(() => {
-              refreshOnce(attempt + 1);
-            }, Math.min(1000 * attempt + 600, 4000));
+            scheduleUnlock();
           }
         };
 
-        setStatus("종목 저장 완료. 최신 등가율을 불러오는 중입니다...", "loading");
+        setStatus("종목 저장 완료. 새 월간표 계산은 잠시 후 자동 반영됩니다.", "success");
         window.setTimeout(() => {
-          refreshOnce(1);
-        }, 900);
+          refreshOnce();
+        }, 45000);
       };
 
       const installRuntimePatches = () => {
@@ -230,6 +220,9 @@
               if (typeof trackDashboardSearch === "function") {
                 trackDashboardSearch(codes, targetDate, true, { reason: "save-tickers" });
               }
+              if (typeof renderSlotGrid === "function") {
+                renderSlotGrid();
+              }
               startBackgroundDashboardRefresh(codes, targetDate);
               scheduleUnlock();
               return { ok: true, pendingRefresh: true };
@@ -269,6 +262,8 @@
               const result = await saveTickerCodes(tickers);
               if (!result?.pendingRefresh) {
                 setStatus("종목 저장 완료", "success");
+              } else {
+                setStatus("종목 저장 완료. 새 월간표 계산은 잠시 후 자동 반영됩니다.", "success");
               }
               return result;
             } finally {
