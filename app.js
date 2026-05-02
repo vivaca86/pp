@@ -35,6 +35,10 @@ const DEFAULT_DASHBOARD_SNAPSHOT_URL = String(
   window.PP_CONFIG?.dashboardSnapshotUrl
   || "./dashboard-latest.json"
 ).trim();
+const DEFAULT_DASHBOARD_API_V2_URL = String(
+  window.PP_CONFIG?.dashboardApiV2Url
+  || ""
+).trim();
 const DEFAULT_DASHBOARD_SOURCE_MODE = "api";
 const KRX_FIXED_MARKET_CLOSURE_MMDD = new Set(["05-01", "12-31"]);
 const KRX_KNOWN_MARKET_CLOSURES = new Set([
@@ -1127,6 +1131,58 @@ function buildDashboardSnapshotUrl(date) {
   if (date) url.searchParams.set("date", date);
   url.searchParams.set("v", String(Math.floor(Date.now() / 60000)));
   return url.toString();
+}
+
+function getDashboardApiTickerMeta(tickers) {
+  return tickers.map((code) => {
+    const normalized = normalizeTicker(code);
+    const slot = state.editableSlots.find((item) => normalizeTicker(item.stock?.code || "") === normalized);
+    const stock = slot?.stock || state.catalog.find((item) => normalizeTicker(item.code) === normalized) || null;
+    const enriched = enrichStockMeta({
+      code: normalized,
+      name: stock?.name || "",
+      market: stock?.market || "",
+      assetType: stock?.assetType || "stock"
+    });
+    return {
+      name: String(enriched?.name || stock?.name || normalized).trim(),
+      market: String(enriched?.market || stock?.market || "KRX").trim().toUpperCase()
+    };
+  });
+}
+
+function buildDashboardApiV2Url(date, tickers) {
+  if (!DEFAULT_DASHBOARD_API_V2_URL || !Array.isArray(tickers) || tickers.length !== SLOT_COUNT) return "";
+  const meta = getDashboardApiTickerMeta(tickers);
+  const url = new URL(DEFAULT_DASHBOARD_API_V2_URL, window.location.href);
+  url.searchParams.set("date", date);
+  url.searchParams.set("tickers", tickers.map(normalizeTicker).join(","));
+  url.searchParams.set("names", meta.map((item) => item.name).join(","));
+  url.searchParams.set("markets", meta.map((item) => item.market).join(","));
+  return url.toString();
+}
+
+async function requestDashboardApiV2(date, tickers) {
+  const url = buildDashboardApiV2Url(date, tickers);
+  if (!url) return null;
+
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timeoutId = controller ? window.setTimeout(() => controller.abort(), 18000) : 0;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller?.signal
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload?.ok || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) {
+      throw new Error(payload?.message || payload?.error?.message || "Worker dashboard API failed.");
+    }
+    return payload;
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
 }
 
 function readCachedDashboardPayload(date) {
@@ -2786,6 +2842,15 @@ async function loadDashboardPayloadFromApi(date, options = {}) {
   const tickers = Array.isArray(options.tickers)
     ? options.tickers.map((code) => normalizeTicker(code))
     : getEditableTickerCodes();
+
+  if (tickers.length === SLOT_COUNT) {
+    try {
+      const workerPayload = await requestDashboardApiV2(date, tickers);
+      if (workerPayload) return workerPayload;
+    } catch (error) {
+      console.warn("worker dashboard api v2 failed, fallback to server api", error);
+    }
+  }
 
   if (state.gatewayUrl && tickers.length === SLOT_COUNT) {
     try {
