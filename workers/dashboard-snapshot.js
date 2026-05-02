@@ -6,6 +6,7 @@ const DEFAULT_SERIES_CACHE_TTL_SECONDS = 6 * 60 * 60;
 const EDITABLE_TICKER_COUNT = 6;
 const SERIES_CACHE_VERSION = "v1";
 const SERIES_MISS_FALLBACK_THRESHOLD = 3;
+const SERIES_FULL_RACE_DELAY_MS = 1200;
 const KRX_FIXED_MARKET_CLOSURE_MMDD = new Set(["05-01", "12-31"]);
 const KRX_KNOWN_MARKET_CLOSURES = new Set([
   "2026-05-01"
@@ -440,7 +441,7 @@ async function fetchSeriesRecordFromAppsScript(env, date, target) {
     market: target.editable ? target.market : ""
   });
   if (!url) throw new Error("APPS_SCRIPT_GATEWAY_URL is not configured.");
-  const payload = await fetchJsonWithTimeout(url, 9000);
+  const payload = await fetchJsonWithTimeout(url, 12000);
   return normalizeSeriesRecord(payload, target, safeDate(payload.selectedDate) || resolveKrxTradingDate(date) || date);
 }
 
@@ -634,21 +635,59 @@ async function serveDashboardApiV2(request, env, ctx) {
       return jsonResponse(payload, { headers: { "Cache-Control": "no-store" } });
     }
 
-    await Promise.all(misses.map(async (index) => {
-      const target = targets[index];
-      const record = await fetchSeriesRecordFromAppsScript(env, requestedDate, target);
-      records[index] = record;
-      if (safeDate(record.selectedDate) === estimatedDate) {
-        await writeCachedSeries(env, cacheKeys[index], record);
-      } else if (safeDate(record.selectedDate)) {
-        await writeCachedSeries(env, buildSeriesCacheKey(record.selectedDate, target), record);
-      }
-    }));
+    const fetchMissingSeries = async () => {
+      await Promise.all(misses.map(async (index) => {
+        const target = targets[index];
+        const record = await fetchSeriesRecordFromAppsScript(env, requestedDate, target);
+        records[index] = record;
+        if (safeDate(record.selectedDate) === estimatedDate) {
+          await writeCachedSeries(env, cacheKeys[index], record);
+        } else if (safeDate(record.selectedDate)) {
+          await writeCachedSeries(env, buildSeriesCacheKey(record.selectedDate, target), record);
+        }
+      }));
 
-    const selectedDates = new Set(records.map((record) => safeDate(record?.selectedDate)).filter(Boolean));
-    if (selectedDates.size > 1) {
-      const payload = await fallbackToFullPayload("selected_date_mismatch");
-      return jsonResponse(payload, { headers: { "Cache-Control": "no-store" } });
+      const selectedDates = new Set(records.map((record) => safeDate(record?.selectedDate)).filter(Boolean));
+      if (selectedDates.size > 1) {
+        throw new Error("selected_date_mismatch");
+      }
+
+      metrics.durationMs = Date.now() - startedAt;
+      return buildDashboardPayloadFromSeriesRecords(records, requestedDate, metrics);
+    };
+
+    if (misses.length > 0) {
+      let fallbackStarted = false;
+      let fallbackTimer = 0;
+      let cancelDelayedFallback = false;
+      const delayedFallback = new Promise((resolve, reject) => {
+        fallbackTimer = setTimeout(() => {
+          if (cancelDelayedFallback) return;
+          fallbackStarted = true;
+          fallbackToFullPayload("series_race_full").then(resolve, reject);
+        }, SERIES_FULL_RACE_DELAY_MS);
+      });
+      const seriesResult = fetchMissingSeries();
+      const raceResult = await Promise.race([
+        seriesResult.then((payload) => ({ type: "series", payload })),
+        delayedFallback.then((payload) => ({ type: "fallback", payload }))
+      ]);
+
+      if (raceResult.type === "series") {
+        cancelDelayedFallback = true;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        return jsonResponse(raceResult.payload, {
+          headers: {
+            "Cache-Control": "no-store"
+          }
+        });
+      }
+
+      if (ctx?.waitUntil && !fallbackStarted) {
+        ctx.waitUntil(seriesResult.catch(() => null));
+      }
+
+      return jsonResponse(raceResult.payload, { headers: { "Cache-Control": "no-store" } });
     }
 
     metrics.durationMs = Date.now() - startedAt;
