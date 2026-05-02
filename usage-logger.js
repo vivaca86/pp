@@ -7,6 +7,7 @@
   const LOG_CONTENT_TYPE = "text/plain;charset=UTF-8";
   const debouncedTimers = new Map();
   let flushing = false;
+  let flushTimer = 0;
 
   const getSelectedDate = () => (
     document.getElementById("date-input")?.value
@@ -50,6 +51,7 @@
 
   const enqueue = (payload) => {
     writeQueue([...readQueue(), payload]);
+    scheduleFlush(5000);
   };
 
   const sendPayload = async (payload) => {
@@ -89,6 +91,14 @@
     }
   };
 
+  function scheduleFlush(delayMs = 1200) {
+    if (flushTimer) return;
+    flushTimer = window.setTimeout(() => {
+      flushTimer = 0;
+      flushQueue().catch(() => {});
+    }, delayMs);
+  }
+
   const post = (payload) => {
     if (!LOG_URL) return;
 
@@ -124,9 +134,7 @@
   };
 
   window.addEventListener("online", () => {
-    flushQueue().catch(() => {});
+    scheduleFlush(100);
   });
-  window.setTimeout(() => {
-    flushQueue().catch(() => {});
-  }, 1200);
+  scheduleFlush();
 })();
