@@ -9,6 +9,7 @@ const RECOMMENDATION_GATEWAY_COOLDOWN_MS = 8000;
 const RECOMMENDATION_RUN_COOLDOWN_MS = 12000;
 const RECOMMENDATION_WARMUP_MAX_PERIOD_MONTHS = 12;
 const TICKER_DATALIST_ITEM_LIMIT = 12;
+const TICKER_DATALIST_MIN_QUERY_LENGTH = 2;
 const APP_ERROR_CODES = {
   gatewayMissing: "PP-GATEWAY-MISSING",
   gatewayResponseParse: "PP-GATEWAY-PARSE",
@@ -1015,15 +1016,18 @@ function getTickerSuggestions(query = "") {
   const raw = String(query || "").trim();
   const normalizedText = normalizeSearchText(raw);
   const normalizedTicker = normalizeTicker(raw);
+  if (
+    normalizedText.length < TICKER_DATALIST_MIN_QUERY_LENGTH
+    && normalizedTicker.length < TICKER_DATALIST_MIN_QUERY_LENGTH
+  ) {
+    return [];
+  }
   const candidates = [];
   const seen = new Set();
 
   const scoreItem = (item) => {
     const code = normalizeTicker(item.code);
     const name = normalizeSearchText(item.name);
-    if (!raw) {
-      return QUICK_STOCK_CATALOG.some((stock) => normalizeTicker(stock.code) === code) ? 100 : 0;
-    }
     if (code === normalizedTicker || name === normalizedText) return 1000;
     if (normalizedTicker && code.startsWith(normalizedTicker)) return 800;
     if (normalizedText && name.startsWith(normalizedText)) return 760;
@@ -1060,6 +1064,24 @@ function buildTickerDatalist(query = null) {
     `<option value="${escapeHtml(item.name)}">${escapeHtml(item.code)}</option>` +
     `<option value="${escapeHtml(item.code)}">${escapeHtml(item.name)}</option>`
   )).join("");
+}
+
+function refreshTickerDatalistForInput(input, options = {}) {
+  if (!input) {
+    buildTickerDatalist("");
+    return;
+  }
+
+  const previousValue = String(input.dataset.autocompleteValue || "");
+  const currentValue = String(input.value || "");
+  input.dataset.autocompleteValue = currentValue;
+
+  if (options.suppressOnDelete && currentValue.length < previousValue.length) {
+    buildTickerDatalist("");
+    return;
+  }
+
+  buildTickerDatalist(currentValue);
 }
 
 function buildRequestUrl(params) {
@@ -1405,20 +1427,20 @@ function attachSlotEvents() {
     input.addEventListener("compositionend", () => {
       input.dataset.composing = "false";
       updateSlotPreview(card);
-      buildTickerDatalist(input.value);
+      refreshTickerDatalistForInput(input);
     });
     input.addEventListener("input", () => {
       updateSlotPreview(card);
-      buildTickerDatalist(input.value);
+      refreshTickerDatalistForInput(input, { suppressOnDelete: true });
     });
     input.addEventListener("focus", () => {
-      buildTickerDatalist(input.value);
+      refreshTickerDatalistForInput(input);
       scheduleCatalogLoad();
     }, { once: true });
     input.addEventListener("change", (event) => {
       if (event.isComposing || input.dataset.composing === "true") return;
       updateSlotPreview(card);
-      buildTickerDatalist(input.value);
+      refreshTickerDatalistForInput(input);
       requestSave();
     });
     input.addEventListener("keydown", (event) => {
