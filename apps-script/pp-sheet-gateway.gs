@@ -207,11 +207,6 @@ function handleStockSearch_(params) {
 
 function handleDashboardData_(params) {
   var requestedDateParam = params.date ? resolveKrxTradingDateFast_(coerceIsoDate_(params.date)) : '';
-  var latestSnapshot = requestedDateParam ? loadLatestDashboardSnapshot_(requestedDateParam, false) : null;
-  if (latestSnapshot) {
-    return latestSnapshot;
-  }
-
   var context = openDashboardContext_();
   var currentDate = resolveKrxTradingDateFast_(getSelectedDateIso_(context.controlSheet));
   var requestedDate = requestedDateParam || currentDate;

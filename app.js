@@ -67,6 +67,7 @@ const LOCAL_STOCK_CATALOG = [
   { code: "000660", name: "SK하이닉스", market: "KOSPI", assetType: "stock" },
   { code: "035420", name: "NAVER", market: "KOSPI", assetType: "stock" },
   { code: "035720", name: "카카오", market: "KOSPI", assetType: "stock" },
+  { code: "293490", name: "카카오게임즈", market: "KOSDAQ", assetType: "stock" },
   { code: "005380", name: "현대차", market: "KOSPI", assetType: "stock" },
   { code: "373220", name: "LG에너지솔루션", market: "KOSPI", assetType: "stock" },
   { code: "207940", name: "삼성바이오로직스", market: "KOSPI", assetType: "stock" },
