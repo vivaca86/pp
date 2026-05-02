@@ -9,20 +9,21 @@
   "lastTradingDate": "2026-04-30",
   "lastTradingDateLabel": "2026.04.30",
   "tradingDateCount": 22,
+  "marketHolidays": [],
   "slots": [
     {
       "editable": false,
       "code": "KOSPI",
       "name": "코스피",
       "market": "KOSPI",
-      "total": 0.34776385
+      "total": 0.27605645
     },
     {
       "editable": false,
       "code": "KOSDAQ",
       "name": "코스닥",
       "market": "KOSDAQ",
-      "total": 0.13126197
+      "total": 0.13126199
     },
     {
       "id": 1,
@@ -39,7 +40,7 @@
       "code": "213420",
       "name": "덕산네오룩스",
       "market": "KOSDAQ",
-      "total": 0.36392578,
+      "total": 0.03363403,
       "assetType": "stock"
     },
     {
@@ -48,7 +49,7 @@
       "code": "042700",
       "name": "한미반도체",
       "market": "KOSPI",
-      "total": 0.43481444,
+      "total": 0.42760703,
       "assetType": "stock"
     },
     {
@@ -57,7 +58,7 @@
       "code": "319660",
       "name": "피에스케이",
       "market": "KOSDAQ",
-      "total": -0.00116967,
+      "total": 0.13314587,
       "assetType": "stock"
     },
     {
@@ -72,10 +73,10 @@
     {
       "id": 6,
       "editable": true,
-      "code": "005930",
-      "name": "삼성전자",
-      "market": "KOSPI",
-      "total": 0.34343865,
+      "code": "112040",
+      "name": "위메이드",
+      "market": "KOSDAQ",
+      "total": 0.21761966,
       "assetType": "stock"
     }
   ],
@@ -113,8 +114,8 @@
           "display": "-"
         },
         {
-          "value": -0.02433628,
-          "display": "-2.43%"
+          "value": -0.00399202,
+          "display": "-0.40%"
         }
       ]
     },
@@ -151,8 +152,8 @@
           "display": "-"
         },
         {
-          "value": 0.01801802,
-          "display": "1.80%"
+          "value": 0.02874743,
+          "display": "2.87%"
         }
       ]
     },
@@ -189,8 +190,8 @@
           "display": "-"
         },
         {
-          "value": -0.01113586,
-          "display": "-1.11%"
+          "value": 0.06798246,
+          "display": "6.80%"
         }
       ]
     },
@@ -227,8 +228,8 @@
           "display": "-"
         },
         {
-          "value": 0.02277904,
-          "display": "2.28%"
+          "value": -0.01511879,
+          "display": "-1.51%"
         }
       ]
     },
@@ -265,8 +266,8 @@
           "display": "-"
         },
         {
-          "value": -0.02227171,
-          "display": "-2.23%"
+          "value": 0.01091703,
+          "display": "1.09%"
         }
       ]
     },
@@ -303,8 +304,8 @@
           "display": "-"
         },
         {
-          "value": 0.03218391,
-          "display": "3.22%"
+          "value": -0.03781513,
+          "display": "-3.78%"
         }
       ]
     },
@@ -341,8 +342,8 @@
           "display": "-"
         },
         {
-          "value": -0.00684932,
-          "display": "-0.68%"
+          "value": -0.01244813,
+          "display": "-1.24%"
         }
       ]
     },
@@ -379,8 +380,8 @@
           "display": "-"
         },
         {
-          "value": 0.02097902,
-          "display": "2.10%"
+          "value": -0.07129094,
+          "display": "-7.13%"
         }
       ]
     },
@@ -417,8 +418,8 @@
           "display": "-"
         },
         {
-          "value": -0.00694444,
-          "display": "-0.69%"
+          "value": 0.19310345,
+          "display": "19.31%"
         }
       ]
     },
@@ -455,8 +456,8 @@
           "display": "-"
         },
         {
-          "value": -0.00689655,
-          "display": "-0.69%"
+          "value": -0.01360544,
+          "display": "-1.36%"
         }
       ]
     },
@@ -493,8 +494,8 @@
           "display": "-"
         },
         {
-          "value": 0.03080569,
-          "display": "3.08%"
+          "value": 0.03521127,
+          "display": "3.52%"
         }
       ]
     },
@@ -531,8 +532,8 @@
           "display": "-"
         },
         {
-          "value": 0.02179177,
-          "display": "2.18%"
+          "value": 0.00947867,
+          "display": "0.95%"
         }
       ]
     },
@@ -569,8 +570,8 @@
           "display": "-"
         },
         {
-          "value": 0.02736318,
-          "display": "2.74%"
+          "value": 0.03431373,
+          "display": "3.43%"
         }
       ]
     },
@@ -607,8 +608,8 @@
           "display": "-"
         },
         {
-          "value": -0.02427184,
-          "display": "-2.43%"
+          "value": -0.01449275,
+          "display": "-1.45%"
         }
       ]
     },
@@ -645,8 +646,8 @@
           "display": "-"
         },
         {
-          "value": 0.00980392,
-          "display": "0.98%"
+          "value": 0.00242131,
+          "display": "0.24%"
         }
       ]
     },
@@ -683,8 +684,8 @@
           "display": "-"
         },
         {
-          "value": -0.03087886,
-          "display": "-3.09%"
+          "value": 0.00486618,
+          "display": "0.49%"
         }
       ]
     },
@@ -721,8 +722,8 @@
           "display": "-"
         },
         {
-          "value": 0.07124682,
-          "display": "7.12%"
+          "value": 0.05927835,
+          "display": "5.93%"
         }
       ]
     },
@@ -759,8 +760,8 @@
           "display": "-"
         },
         {
-          "value": 0.01760746,
-          "display": "1.76%"
+          "value": -0.00767263,
+          "display": "-0.77%"
         }
       ]
     },
@@ -797,8 +798,8 @@
           "display": "-"
         },
         {
-          "value": 0.03705693,
-          "display": "3.71%"
+          "value": -0.0225,
+          "display": "-2.25%"
         }
       ]
     },
@@ -835,8 +836,8 @@
           "display": "-"
         },
         {
-          "value": 0.04372197,
-          "display": "4.37%"
+          "value": -0.01234568,
+          "display": "-1.23%"
         }
       ]
     },
@@ -873,8 +874,8 @@
           "display": "-"
         },
         {
-          "value": -0.0593198,
-          "display": "-5.93%"
+          "value": -0.05373832,
+          "display": "-5.37%"
         }
       ]
     },
@@ -911,18 +912,18 @@
           "display": "-"
         },
         {
-          "value": 0.13427033,
-          "display": "13.43%"
+          "value": 0.03631961,
+          "display": "3.63%"
         }
       ]
     }
   ],
-  "updatedAt": "2026-05-02T09:49:27+09:00",
-  "snapshotUpdatedAt": "2026-05-02T09:49:27+09:00",
-  "snapshotAgeSeconds": 1,
+  "updatedAt": "2026-05-02T13:35:38+09:00",
+  "snapshotUpdatedAt": "2026-05-02T13:35:38+09:00",
+  "snapshotAgeSeconds": 267,
   "snapshotSource": "request",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-05-02T00:49:27.105Z",
+  "staticPublishedAt": "2026-05-02T04:40:03.456Z",
   "staticGenerator": "github-actions"
 }

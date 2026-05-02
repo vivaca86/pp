@@ -14,6 +14,7 @@ const quickStockCatalog = new Map([
   ["319660", { name: "피에스케이", market: "KOSDAQ", assetType: "stock" }],
   ["Q530095", { name: "삼성 구리 선물 ETN(H)", market: "KOSPI", assetType: "etn" }],
   ["005930", { name: "삼성전자", market: "KOSPI", assetType: "stock" }]
+  ,["112040", { name: "위메이드", market: "KOSDAQ", assetType: "stock" }]
 ]);
 
 function extractGatewayUrl(configText) {

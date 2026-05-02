@@ -206,14 +206,14 @@ function handleStockSearch_(params) {
 }
 
 function handleDashboardData_(params) {
-  var requestedDateParam = params.date ? resolveKrxTradingDate_(coerceIsoDate_(params.date)) : '';
+  var requestedDateParam = params.date ? resolveKrxTradingDateFast_(coerceIsoDate_(params.date)) : '';
   var latestSnapshot = requestedDateParam ? loadLatestDashboardSnapshot_(requestedDateParam, false) : null;
   if (latestSnapshot) {
     return latestSnapshot;
   }
 
   var context = openDashboardContext_();
-  var currentDate = resolveKrxTradingDate_(getSelectedDateIso_(context.controlSheet));
+  var currentDate = resolveKrxTradingDateFast_(getSelectedDateIso_(context.controlSheet));
   var requestedDate = requestedDateParam || currentDate;
 
   if (requestedDate !== getSelectedDateIso_(context.controlSheet)) {
@@ -241,7 +241,7 @@ function handleDashboardData_(params) {
 
 function handleDashboardSnapshotStatus_(params) {
   var context = openDashboardContext_();
-  var dateIso = resolveKrxTradingDate_(params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet));
+  var dateIso = resolveKrxTradingDateFast_(params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet));
   var tickerCodes = getTickerCodes_(context.controlSheet);
   var snapshot = loadDashboardSnapshot_(dateIso, tickerCodes, true);
 
@@ -273,7 +273,7 @@ function handleDashboardSnapshotRefresh_(params) {
 
   if (untilMs > nowMs) {
     var context = openDashboardContext_();
-    var dateIso = resolveKrxTradingDate_(params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet));
+    var dateIso = resolveKrxTradingDateFast_(params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet));
     var tickerCodes = getTickerCodes_(context.controlSheet);
     var snapshot = loadDashboardSnapshot_(dateIso, tickerCodes, true);
     var status = buildDashboardSnapshotStatusPayload_(dateIso, tickerCodes, snapshot);
@@ -444,7 +444,7 @@ function loadDashboardSnapshot_(dateIso, codes, allowStale) {
   if (!snapshot || !snapshot.ok || !Array.isArray(snapshot.rows) || !Array.isArray(snapshot.slots)) {
     return null;
   }
-  if (isKrxMarketClosedDate_(snapshot.selectedDate || dateIso, getBoundaryHolidayDates_(snapshot.selectedDate || dateIso))) {
+  if (isKrxMarketClosedDateFast_(snapshot.selectedDate || dateIso)) {
     return null;
   }
 
@@ -461,7 +461,7 @@ function loadLatestDashboardSnapshot_(dateIso, allowStale) {
   if (!snapshot || !snapshot.ok || !Array.isArray(snapshot.rows) || !Array.isArray(snapshot.slots)) {
     return null;
   }
-  if (isKrxMarketClosedDate_(snapshot.selectedDate || dateIso || todayIsoKst_(), getBoundaryHolidayDates_(snapshot.selectedDate || dateIso || todayIsoKst_()))) {
+  if (isKrxMarketClosedDateFast_(snapshot.selectedDate || dateIso || todayIsoKst_())) {
     return null;
   }
 
@@ -481,7 +481,7 @@ function saveDashboardSnapshot_(dateIso, codes, payload, source) {
   if (!payload || !payload.ok || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) {
     return;
   }
-  if (isKrxMarketClosedDate_(payload.selectedDate || dateIso, getBoundaryHolidayDates_(payload.selectedDate || dateIso))) {
+  if (isKrxMarketClosedDateFast_(payload.selectedDate || dateIso)) {
     return;
   }
 
@@ -2320,6 +2320,12 @@ function isKrxMarketClosedDate_(dateIso, holidays) {
   if (isWeekendIso_(dateIso)) return true;
   if (KRX_FIXED_MARKET_CLOSURE_MMDD[String(dateIso).slice(5)]) return true;
   return arrayContains_(Array.isArray(holidays) ? holidays : getKrxHolidayDates_(dateIso), dateIso);
+}
+
+function isKrxMarketClosedDateFast_(dateIso) {
+  if (!dateIso) return true;
+  if (isWeekendIso_(dateIso)) return true;
+  return Boolean(KRX_FIXED_MARKET_CLOSURE_MMDD[String(dateIso).slice(5)]);
 }
 
 function resolveKrxTradingDate_(dateIso) {
