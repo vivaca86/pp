@@ -133,6 +133,8 @@ function routeGatewayAction_(action, params) {
       return handleStockSearch_(params);
     case 'dashboard-data':
       return handleDashboardData_(params);
+    case 'dashboard-data-api':
+      return handleDashboardDataApi_(params);
     case 'dashboard-snapshot-status':
       return handleDashboardSnapshotStatus_(params);
     case 'dashboard-snapshot-refresh':
@@ -232,6 +234,210 @@ function handleDashboardData_(params) {
   saveDashboardPayloadCache_(payload.selectedDate || requestedDate, tickerCodes, payload);
   saveDashboardSnapshot_(payload.selectedDate || requestedDate, tickerCodes, payload, 'request');
   return payload;
+}
+
+function handleDashboardDataApi_(params) {
+  var requestedDate = resolveKrxTradingDateLite_(params.date ? coerceIsoDate_(params.date) : todayIsoKst_());
+  var tickerCodes = params.tickers
+    ? parseTickerList_(params.tickers).map(sanitizeStockCode_)
+    : getTickerCodes_(openDashboardContext_().controlSheet);
+  var cachedPayload = loadDashboardPayloadCache_(requestedDate, tickerCodes);
+
+  if (cachedPayload) {
+    cachedPayload.sourceMode = 'api';
+    cachedPayload.apiComputed = true;
+    return cachedPayload;
+  }
+
+  var payload = buildApiDashboardPayload_(requestedDate, tickerCodes);
+  saveDashboardPayloadCache_(payload.selectedDate || requestedDate, tickerCodes, payload);
+  return payload;
+}
+
+function buildApiDashboardPayload_(selectedDate, tickerCodes) {
+  var selectedMonth = selectedDate.slice(0, 7);
+  var monthStart = startOfMonthIso_(selectedDate);
+  var marketHolidays = getKrxHolidayDatesLite_(selectedDate);
+  var boundaryHolidays = getBoundaryHolidayDatesLite_(selectedDate);
+  var historyEndDate = resolveSeriesEndDate_(selectedDate, boundaryHolidays);
+  var catalogByCode = buildCachedStockCatalogLookup_();
+  var seriesCollection = [
+    buildApiIndexDashboardSeries_('0001', 'KOSPI', '코스피', 'KOSPI', selectedDate, historyEndDate, monthStart, boundaryHolidays),
+    buildApiIndexDashboardSeries_('1001', 'KOSDAQ', '코스닥', 'KOSDAQ', selectedDate, historyEndDate, monthStart, boundaryHolidays)
+  ];
+
+  for (var index = 0; index < tickerCodes.length; index += 1) {
+    seriesCollection.push(buildApiEquityDashboardSeries_(tickerCodes[index], index + 1, selectedDate, historyEndDate, monthStart, boundaryHolidays, catalogByCode));
+  }
+
+  var dateMap = {};
+  for (var seriesIndex = 0; seriesIndex < seriesCollection.length; seriesIndex += 1) {
+    var rows = seriesCollection[seriesIndex].rows;
+    for (var rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      var rowDate = rows[rowIndex].date;
+      if (rowDate && rowDate.slice(0, 7) === selectedMonth && !isKrxMarketClosedDate_(rowDate, boundaryHolidays)) {
+        dateMap[rowDate] = true;
+      }
+    }
+  }
+
+  var dates = Object.keys(dateMap).sort();
+  var dashboardRows = [];
+  for (var dateIndex = 0; dateIndex < dates.length; dateIndex += 1) {
+    var dateIso = dates[dateIndex];
+    dashboardRows.push({
+      date: dateIso,
+      displayDate: formatMonthDay_(dateIso),
+      values: seriesCollection.map(function (series) {
+        var item = series.rowMap[dateIso];
+        return {
+          value: item && isFiniteNumber_(item.equalRate) ? roundNumber_(item.equalRate, 8) : null,
+          display: item && isFiniteNumber_(item.equalRate) ? formatPercent_(item.equalRate) : '-'
+        };
+      })
+    });
+  }
+
+  var slots = seriesCollection.map(function (series, slotIndex) {
+    var total = 0;
+    for (var rowIndex = 0; rowIndex < dashboardRows.length; rowIndex += 1) {
+      var value = Number(dashboardRows[rowIndex].values[slotIndex].value);
+      if (isFiniteNumber_(value)) total += value;
+    }
+    var slot = assignOwnProperties_({}, series.slot);
+    slot.total = roundNumber_(total, 8);
+    return slot;
+  });
+  var lastTradingDate = dashboardRows.length ? dashboardRows[dashboardRows.length - 1].date : selectedDate;
+
+  return {
+    ok: true,
+    service: 'pp-sheet-gateway',
+    spreadsheetTitle: 'api-dashboard',
+    selectedDate: selectedDate,
+    selectedDateLabel: formatHumanDate_(selectedDate),
+    selectedDateIsTradingDay: !isKrxMarketClosedDate_(selectedDate, boundaryHolidays),
+    today: todayIsoKst_(),
+    lastTradingDate: lastTradingDate,
+    lastTradingDateLabel: formatHumanDate_(lastTradingDate),
+    tradingDateCount: dashboardRows.length,
+    marketHolidays: marketHolidays,
+    slots: slots,
+    rows: dashboardRows,
+    updatedAt: formatKstTimestamp_(new Date()),
+    sourceMode: 'api',
+    apiComputed: true
+  };
+}
+
+function buildApiIndexDashboardSeries_(fetchCode, displayCode, name, market, selectedDate, historyEndDate, monthStart, holidays) {
+  var rows = fetchIndexDailyRowsForDashboard_(fetchCode, historyEndDate);
+  return buildApiDashboardSeriesFromRows_({
+    editable: false,
+    code: displayCode,
+    name: name,
+    market: market,
+    assetType: 'index'
+  }, rows, selectedDate, monthStart, holidays);
+}
+
+function buildApiEquityDashboardSeries_(ticker, slotId, selectedDate, historyEndDate, monthStart, holidays, catalogByCode) {
+  var code = sanitizeStockCode_(ticker);
+  if (!code) {
+    return buildApiDashboardSeriesFromRows_({
+      id: slotId,
+      editable: true,
+      code: '',
+      name: '종목명 확인 필요',
+      market: '',
+      assetType: 'stock'
+    }, [], selectedDate, monthStart, holidays);
+  }
+
+  var stock = catalogByCode && catalogByCode[code] ? catalogByCode[code] : { code: code, name: code, market: 'KRX' };
+  var rows = fetchDailyCloseRowsForDashboard_(code, addDaysIso_(monthStart, -40), historyEndDate);
+  return buildApiDashboardSeriesFromRows_({
+    id: slotId,
+    editable: true,
+    code: code,
+    name: stock.name || code,
+    market: stock.market || 'KRX',
+    assetType: inferAssetType_(code, stock)
+  }, rows, selectedDate, monthStart, holidays);
+}
+
+function buildApiDashboardSeriesFromRows_(slot, closeRows, selectedDate, monthStart, holidays) {
+  var partition = partitionMonthRows_(closeRows || [], monthStart);
+  var previousClose = Number(partition.baselineClose);
+  var equalRows = [];
+  var rowMap = {};
+
+  for (var i = 0; i < partition.rows.length; i += 1) {
+    var row = partition.rows[i];
+    if (!row.date || row.date > selectedDate || isKrxMarketClosedDate_(row.date, holidays)) {
+      continue;
+    }
+    var close = Number(row.close);
+    var equalRate = Number.isFinite(previousClose) && previousClose !== 0 && Number.isFinite(close)
+      ? (close / previousClose) - 1
+      : null;
+    previousClose = close;
+
+    var item = {
+      date: row.date,
+      close: close,
+      equalRate: equalRate
+    };
+    equalRows.push(item);
+    rowMap[row.date] = item;
+  }
+
+  return {
+    slot: slot,
+    rows: equalRows,
+    rowMap: rowMap,
+    lastTradingDate: inferLastTradingDate_(selectedDate, monthStart, partition.rows, holidays)
+  };
+}
+
+function fetchDailyCloseRowsForDashboard_(ticker, startDateIso, endDateIso) {
+  return fetchDailyPriceRowsForDashboard_(ticker, startDateIso, endDateIso)
+    .map(function (item) {
+      return {
+        date: item.date,
+        close: item.close
+      };
+    });
+}
+
+function fetchDailyPriceRowsForDashboard_(ticker, startDateIso, endDateIso) {
+  var code = sanitizeStockCode_(ticker);
+  var cacheKey = ['dashboard-daily-price-v2', code, startDateIso, endDateIso].join(':');
+  var cached = loadCachedValue_(cacheKey) || loadTransientCachedValue_(cacheKey);
+  if (cached && Array.isArray(cached.rows)) {
+    return cached.rows;
+  }
+
+  var rows = fetchDailyPriceRows_(code, startDateIso, endDateIso);
+  var payload = { rows: rows };
+  saveTransientCachedValue_(cacheKey, payload, STOCK_EQ_GATEWAY.recommendationCacheHours);
+  saveCachedValue_(cacheKey, payload, STOCK_EQ_GATEWAY.recommendationCacheHours);
+  return rows;
+}
+
+function fetchIndexDailyRowsForDashboard_(indexCode, endDateIso) {
+  var code = sanitizeStockCode_(indexCode);
+  var cacheKey = ['dashboard-index-daily-v2', code, endDateIso].join(':');
+  var cached = loadCachedValue_(cacheKey) || loadTransientCachedValue_(cacheKey);
+  if (cached && Array.isArray(cached.rows)) {
+    return cached.rows;
+  }
+
+  var rows = fetchIndexDailyRows_(code, endDateIso);
+  var payload = { rows: rows };
+  saveTransientCachedValue_(cacheKey, payload, STOCK_EQ_GATEWAY.recommendationCacheHours);
+  saveCachedValue_(cacheKey, payload, STOCK_EQ_GATEWAY.recommendationCacheHours);
+  return rows;
 }
 
 function handleDashboardSnapshotStatus_(params) {
@@ -1720,6 +1926,15 @@ function findStockByCode_(code) {
   return null;
 }
 
+function inferAssetType_(code, stock) {
+  var normalizedCode = sanitizeStockCode_(code);
+  var name = String(stock && stock.name || '').toUpperCase();
+  if (name.indexOf('ETN') >= 0) return 'etn';
+  if (name.indexOf('ETF') >= 0) return 'etf';
+  if (/^[A-Z]/.test(normalizedCode)) return 'etn';
+  return 'stock';
+}
+
 function getStockCatalog_() {
   var cacheKey = 'catalog';
   var cached = loadCachedValue_(cacheKey);
@@ -2308,6 +2523,40 @@ function getKrxHolidayDates_(dateIso) {
   return uniqueStrings_(
     getMonthlyHolidayDates_(dateIso).concat(getKrxFixedMarketClosureDatesForMonth_(dateIso))
   ).sort();
+}
+
+function getKrxHolidayDatesLite_(dateIso) {
+  var monthKey = String(dateIso || '').slice(0, 7);
+  var days = getKrxFixedMarketClosureDatesForMonth_(dateIso);
+  try {
+    var holidaySet = getKoreanHolidaySet_();
+    var keys = Object.keys(holidaySet || {});
+    for (var i = 0; i < keys.length; i += 1) {
+      if (String(keys[i]).indexOf(monthKey) === 0) {
+        days.push(keys[i]);
+      }
+    }
+  } catch (error) {
+    console.warn('lite holiday lookup failed', error);
+  }
+  return uniqueStrings_(days).sort();
+}
+
+function getBoundaryHolidayDatesLite_(selectedDate) {
+  var monthStart = startOfMonthIso_(selectedDate);
+  var prevMonthDate = addDaysIso_(monthStart, -1);
+  return uniqueStrings_(getKrxHolidayDatesLite_(selectedDate).concat(getKrxHolidayDatesLite_(prevMonthDate))).sort();
+}
+
+function resolveKrxTradingDateLite_(dateIso) {
+  var cursor = coerceIsoDate_(dateIso);
+  for (var guard = 0; guard < 370; guard += 1) {
+    if (!isWeekendIso_(cursor) && !arrayContains_(getKrxHolidayDatesLite_(cursor), cursor)) {
+      return cursor;
+    }
+    cursor = addDaysIso_(cursor, -1);
+  }
+  return cursor;
 }
 
 function isKrxMarketClosedDate_(dateIso, holidays) {

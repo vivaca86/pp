@@ -122,6 +122,7 @@ const state = {
   dashboardFromCache: false,
   snapshotStatus: null,
   snapshotRefreshing: false,
+  dashboardRefreshSeq: 0,
   activeView: "calculator",
   lastDashboardLoadedAt: 0,
   mobileSlideIndex: 0,
@@ -985,7 +986,11 @@ function ensureGatewayCard() {
 function enrichStockMeta(stock) {
   if (!stock) return null;
   const code = normalizeTicker(stock.code);
-  const fallback = LOCAL_STOCK_CATALOG.find((item) => normalizeTicker(item.code) === code) || {};
+  const catalogFallback = Array.isArray(state.catalog)
+    ? state.catalog.find((item) => normalizeTicker(item.code) === code)
+    : null;
+  const localFallback = LOCAL_STOCK_CATALOG.find((item) => normalizeTicker(item.code) === code);
+  const fallback = catalogFallback || localFallback || {};
   const rawName = String(stock.name || "").trim();
   const fallbackName = String(fallback.name || "").trim();
   const nameLooksLikeCode = rawName && normalizeTicker(rawName) === code;
@@ -1300,6 +1305,9 @@ async function resolveTickerCodeForSave(rawValue) {
 
   try {
     const payload = await requestGateway({ action: "stock-search", q: raw });
+    if (Array.isArray(payload?.items) && payload.items.length) {
+      state.catalog = mergeCatalogs(payload.items, state.catalog);
+    }
     const first = Array.isArray(payload?.items) ? payload.items[0] : null;
     if (first?.code) return normalizeTicker(first.code);
   } catch (error) {
@@ -1440,16 +1448,25 @@ async function saveTickerCodes(codes) {
     date: targetDate
   });
   trackDashboardSearch(requestedCodes, targetDate, true);
+  syncEditableSlotsFromCodes(requestedCodes);
+  setStatus("\uc885\ubaa9 \uc800\uc7a5 \uc644\ub8cc. \uc6d4\uac04\ud45c \uac31\uc2e0 \uc911...", "loading");
 
-  const areTickersApplied = (payload) => {
-    const applied = Array.isArray(payload?.slots)
-      ? payload.slots
-        .filter((slot) => slot?.editable)
-        .map((slot) => normalizeTicker(slot.code || ""))
-      : [];
-    if (applied.length !== requestedCodes.length) return false;
-    return applied.every((code, index) => code === requestedCodes[index]);
-  };
+  const refreshSeq = state.dashboardRefreshSeq + 1;
+  state.dashboardRefreshSeq = refreshSeq;
+  (async () => {
+    try {
+      const payload = await loadDashboardPayloadFromApi(targetDate, { tickers: requestedCodes });
+      if (state.dashboardRefreshSeq !== refreshSeq) return;
+      renderDashboard(payload, { cache: true });
+      setStatus("\uc6d4\uac04\ud45c \uac31\uc2e0 \uc644\ub8cc.", "success");
+    } catch (error) {
+      if (state.dashboardRefreshSeq !== refreshSeq) return;
+      console.warn("dashboard refresh after save", error);
+      setStatus("\uc885\ubaa9 \uc800\uc7a5 \uc644\ub8cc. \uc6d4\uac04\ud45c\ub294 \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uac31\uc2e0\ud574 \uc8fc\uc138\uc694.", "loading");
+    }
+  })();
+
+  return { ok: true, pendingRecalc: true };
 
   (async () => {
     const maxAttempts = 12;
@@ -1792,6 +1809,25 @@ function syncEditableSlotsFromDashboard(slots = []) {
       stock: slot.code ? enrichStockMeta(slot) : null,
       editable: true
     }));
+}
+
+function syncEditableSlotsFromCodes(codes = []) {
+  state.editableSlots = Array.from({ length: SLOT_COUNT }, (_, index) => {
+    const code = normalizeTicker(codes[index] || "");
+    const stock = code ? (findCatalogItem(code) || enrichStockMeta({ code })) : null;
+    return {
+      id: index + 1,
+      query: stock?.name || code,
+      stock,
+      editable: true
+    };
+  });
+}
+
+function getEditableTickerCodes() {
+  const codes = state.editableSlots.map((slot) => normalizeTicker(slot?.stock?.code || slot?.query || ""));
+  while (codes.length < SLOT_COUNT) codes.push("");
+  return codes.slice(0, SLOT_COUNT);
 }
 
 function renderTable(payload) {
@@ -2607,11 +2643,28 @@ async function loadRecommendations() {
 
 function getDashboardSourceMode() {
   const configured = String(window.PP_CONFIG?.dashboardSourceMode || DEFAULT_DASHBOARD_SOURCE_MODE).trim().toLowerCase();
+  if (configured === "api") return "api";
   const persisted = String(localStorage.getItem(STORAGE_DASHBOARD_SOURCE_MODE) || configured).trim().toLowerCase();
   return persisted === "sheet" ? "sheet" : "api";
 }
 
-async function loadDashboardPayloadFromApi(date) {
+async function loadDashboardPayloadFromApi(date, options = {}) {
+  const tickers = Array.isArray(options.tickers)
+    ? options.tickers.map((code) => normalizeTicker(code))
+    : getEditableTickerCodes();
+
+  if (state.gatewayUrl && tickers.length === SLOT_COUNT) {
+    try {
+      return await requestGateway({
+        action: "dashboard-data-api",
+        date,
+        tickers: tickers.join(",")
+      });
+    } catch (error) {
+      console.warn("server dashboard api failed, fallback to client composition", error);
+    }
+  }
+
   if (!window.DashboardApiSource?.loadPayload) {
     throw buildAppError(APP_ERROR_CODES.gatewayMissing, "API 데이터 소스 모듈을 찾지 못했습니다.");
   }
