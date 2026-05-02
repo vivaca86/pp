@@ -1465,58 +1465,48 @@ async function saveTickerCodes(codes) {
   const requestedCodes = codes.map((code) => normalizeTicker(code));
   clearCachedDashboardPayload();
   trackDashboardSearch(requestedCodes, targetDate, true, { reason: "search-submit" });
-  await requestGateway({
-    action: "update-tickers",
-    tickers: codes.join(","),
-    date: targetDate
-  });
   syncEditableSlotsFromCodes(requestedCodes);
-  setStatus("\uc885\ubaa9 \uc800\uc7a5 \uc644\ub8cc. \uc6d4\uac04\ud45c \uac31\uc2e0 \uc911...", "loading");
+  setStatus("\uc6d4\uac04\ud45c \uac31\uc2e0 \uc911...", "loading");
 
   const refreshSeq = state.dashboardRefreshSeq + 1;
   state.dashboardRefreshSeq = refreshSeq;
+
+  const savePromise = requestGateway({
+    action: "update-tickers",
+    tickers: codes.join(","),
+    date: targetDate
+  }).then(() => ({ ok: true })).catch((error) => {
+    console.warn("ticker save failed after dashboard refresh started", error);
+    trackDashboardSearch(requestedCodes, targetDate, false, {
+      reason: String(error?.code || error?.message || "save-tickers-failed").slice(0, 48)
+    });
+    return { ok: false, error };
+  });
+
   (async () => {
+    let dashboardRendered = false;
     try {
       const payload = await loadDashboardPayloadFromApi(targetDate, { tickers: requestedCodes });
       if (state.dashboardRefreshSeq !== refreshSeq) return;
       renderDashboard(payload, { cache: true });
-      setStatus("\uc6d4\uac04\ud45c \uac31\uc2e0 \uc644\ub8cc.", "success");
+      dashboardRendered = true;
+      setStatus("\uc6d4\uac04\ud45c \uac31\uc2e0 \uc644\ub8cc. \uc885\ubaa9 \uc800\uc7a5 \ud655\uc778 \uc911...", "success");
     } catch (error) {
       if (state.dashboardRefreshSeq !== refreshSeq) return;
       console.warn("dashboard refresh after save", error);
-      setStatus("\uc885\ubaa9 \uc800\uc7a5 \uc644\ub8cc. \uc6d4\uac04\ud45c\ub294 \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uac31\uc2e0\ud574 \uc8fc\uc138\uc694.", "loading");
+      setStatus("\uc885\ubaa9 \uc800\uc7a5 \uc911. \uc6d4\uac04\ud45c\ub294 \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uac31\uc2e0\ud574 \uc8fc\uc138\uc694.", "loading");
+    }
+
+    const saveResult = await savePromise;
+    if (state.dashboardRefreshSeq !== refreshSeq) return;
+    if (saveResult.ok) {
+      setStatus(dashboardRendered ? "\uc6d4\uac04\ud45c \uac31\uc2e0 \ubc0f \uc885\ubaa9 \uc800\uc7a5 \uc644\ub8cc." : "\uc885\ubaa9 \uc800\uc7a5 \uc644\ub8cc.", "success");
+    } else {
+      setStatus(dashboardRendered ? "\uc6d4\uac04\ud45c\ub294 \uac31\uc2e0\ub410\uc9c0\ub9cc \uc885\ubaa9 \uc800\uc7a5\uc740 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4." : "\uc885\ubaa9 \uc800\uc7a5\uc774 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.", "error");
     }
   })();
 
-  return { ok: true, pendingRecalc: true };
-
-  (async () => {
-    const maxAttempts = 12;
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      try {
-        const payload = await requestGateway({ action: "dashboard-data", date: targetDate });
-        if (!areTickersApplied(payload)) {
-          if (attempt < maxAttempts) await waitMs(1500);
-          continue;
-        }
-        renderDashboard(payload);
-        setStatus("지정된 종목으로 월간표를 갱신했습니다.", "success");
-        return;
-      } catch (error) {
-        const code = String(error?.code || "").trim();
-        if (code === APP_ERROR_CODES.monthlyDataSparse && attempt < maxAttempts) {
-          await waitMs(1500);
-          continue;
-        }
-        console.warn("dashboard refresh after save", error);
-        break;
-      }
-    }
-
-    setStatus("종목 저장 완료 · 월간표 반영 대기 중", "loading");
-  })();
-
-  return { ok: true, pendingRecalc: true };
+  return { ok: true, pendingRefresh: true };
 }
 
 async function saveTickers() {
@@ -1533,8 +1523,10 @@ async function saveTickers() {
     }
 
     const tickers = await Promise.all(inputs.map((input) => resolveTickerCodeForSave(input.value)));
-    await saveTickerCodes(tickers);
-    setStatus("종목 저장 완료", "success");
+    const result = await saveTickerCodes(tickers);
+    if (!result?.pendingRefresh) {
+      setStatus("종목 저장 완료", "success");
+    }
   } finally {
     state.saving = false;
     setBusyState(false);
