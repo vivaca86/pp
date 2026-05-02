@@ -749,6 +749,33 @@ function compactUsageEvent(event) {
   };
 }
 
+function isPublicUsageEvent(event) {
+  const source = String(event?.metadata?.source || "pp-web").trim();
+  return !source || source === "pp-web";
+}
+
+function subtractUsageEventFromSummary(summary, event) {
+  if (!summary || !event) return;
+  summary.total = Math.max(0, Number(summary.total || 0) - 1);
+  if (summary.events && event.event) {
+    summary.events[event.event] = Math.max(0, Number(summary.events[event.event] || 0) - 1);
+    if (!summary.events[event.event]) delete summary.events[event.event];
+  }
+  if (summary.views && event.view) {
+    summary.views[event.view] = Math.max(0, Number(summary.views[event.view] || 0) - 1);
+    if (!summary.views[event.view]) delete summary.views[event.view];
+  }
+  if (event.success === true) summary.successes = Math.max(0, Number(summary.successes || 0) - 1);
+  if (event.success === false) summary.failures = Math.max(0, Number(summary.failures || 0) - 1);
+  if (Number.isFinite(event.durationMs) && Number(summary.durationCount || 0) > 0) {
+    summary.durationCount = Math.max(0, Number(summary.durationCount || 0) - 1);
+    summary.durationTotalMs = Math.max(0, Number(summary.durationTotalMs || 0) - Number(event.durationMs || 0));
+    summary.avgDurationMs = summary.durationCount
+      ? Math.round(summary.durationTotalMs / summary.durationCount)
+      : null;
+  }
+}
+
 function getUsageKv(env) {
   return env.PP_USAGE_LOGS || env.PP_DASHBOARD_SNAPSHOT || null;
 }
@@ -902,6 +929,15 @@ async function serveUsageSummary(request, env) {
     });
   }
 
+  const summaryByDay = new Map(summaries.map((summary) => [summary.day, summary]));
+  const recentEvents = await usageKv.get("usage:recent", { type: "json" });
+  if (Array.isArray(recentEvents)) {
+    recentEvents.forEach((event) => {
+      if (isPublicUsageEvent(event)) return;
+      subtractUsageEventFromSummary(summaryByDay.get(event.day), event);
+    });
+  }
+
   const totals = summaries.reduce((acc, summary) => {
     acc.total += Number(summary.total || 0);
     Object.entries(summary.events || {}).forEach(([event, count]) => {
@@ -937,8 +973,11 @@ async function serveUsageEvents(request, env) {
 
   const url = new URL(request.url);
   const limit = clampNumber(url.searchParams.get("limit"), 1, 200, 50);
+  const includeDebug = url.searchParams.get("debug") === "1";
   const stored = await usageKv.get("usage:recent", { type: "json" });
-  const events = Array.isArray(stored) ? stored.slice(0, limit) : [];
+  const events = Array.isArray(stored)
+    ? stored.filter((event) => includeDebug || isPublicUsageEvent(event)).slice(0, limit)
+    : [];
 
   return jsonResponse({
     ok: true,
