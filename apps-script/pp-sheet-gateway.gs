@@ -85,6 +85,11 @@
   ]
 };
 
+var KRX_FIXED_MARKET_CLOSURE_MMDD = {
+  '05-01': true,
+  '12-31': true
+};
+
 var PP_SHEET_GATEWAY = {
   timezone: 'Asia/Seoul',
   spreadsheetId: '1_vwuRC2LhZvRCf3r6Ub1I3s-RoPxGm8bn5kiUI-m8ik',
@@ -201,17 +206,17 @@ function handleStockSearch_(params) {
 }
 
 function handleDashboardData_(params) {
-  var requestedDateParam = params.date ? coerceIsoDate_(params.date) : '';
-  var latestSnapshot = loadLatestDashboardSnapshot_(requestedDateParam, false);
+  var requestedDateParam = params.date ? resolveKrxTradingDate_(coerceIsoDate_(params.date)) : '';
+  var latestSnapshot = requestedDateParam ? loadLatestDashboardSnapshot_(requestedDateParam, false) : null;
   if (latestSnapshot) {
     return latestSnapshot;
   }
 
   var context = openDashboardContext_();
-  var currentDate = getSelectedDateIso_(context.controlSheet);
+  var currentDate = resolveKrxTradingDate_(getSelectedDateIso_(context.controlSheet));
   var requestedDate = requestedDateParam || currentDate;
 
-  if (requestedDate !== currentDate) {
+  if (requestedDate !== getSelectedDateIso_(context.controlSheet)) {
     setSelectedDate_(context.controlSheet, requestedDate);
     waitForDashboardRefresh_(context, requestedDate, null);
   }
@@ -236,7 +241,7 @@ function handleDashboardData_(params) {
 
 function handleDashboardSnapshotStatus_(params) {
   var context = openDashboardContext_();
-  var dateIso = params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet);
+  var dateIso = resolveKrxTradingDate_(params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet));
   var tickerCodes = getTickerCodes_(context.controlSheet);
   var snapshot = loadDashboardSnapshot_(dateIso, tickerCodes, true);
 
@@ -268,7 +273,7 @@ function handleDashboardSnapshotRefresh_(params) {
 
   if (untilMs > nowMs) {
     var context = openDashboardContext_();
-    var dateIso = params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet);
+    var dateIso = resolveKrxTradingDate_(params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet));
     var tickerCodes = getTickerCodes_(context.controlSheet);
     var snapshot = loadDashboardSnapshot_(dateIso, tickerCodes, true);
     var status = buildDashboardSnapshotStatusPayload_(dateIso, tickerCodes, snapshot);
@@ -289,7 +294,7 @@ function handleDashboardSnapshotRefresh_(params) {
 
 function handleUpdateTickers_(params) {
   var context = openDashboardContext_();
-  var requestedDate = params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet);
+  var requestedDate = resolveKrxTradingDate_(params.date ? coerceIsoDate_(params.date) : getSelectedDateIso_(context.controlSheet));
   var requestedCodes = parseTickerList_(params.tickers);
   var waitForStablePayload = String(params.sync || '').trim().toLowerCase() === 'true';
   var resolvedCodes = requestedCodes.map(function (item) {
@@ -439,6 +444,9 @@ function loadDashboardSnapshot_(dateIso, codes, allowStale) {
   if (!snapshot || !snapshot.ok || !Array.isArray(snapshot.rows) || !Array.isArray(snapshot.slots)) {
     return null;
   }
+  if (isKrxMarketClosedDate_(snapshot.selectedDate || dateIso, getBoundaryHolidayDates_(snapshot.selectedDate || dateIso))) {
+    return null;
+  }
 
   snapshot = decorateDashboardSnapshot_(snapshot, snapshot.snapshotSource || 'snapshot');
   if (!allowStale && !isDashboardSnapshotFresh_(snapshot, dateIso)) {
@@ -451,6 +459,9 @@ function loadDashboardSnapshot_(dateIso, codes, allowStale) {
 function loadLatestDashboardSnapshot_(dateIso, allowStale) {
   var snapshot = loadTransientCachedValue_(getLatestDashboardSnapshotCacheKey_());
   if (!snapshot || !snapshot.ok || !Array.isArray(snapshot.rows) || !Array.isArray(snapshot.slots)) {
+    return null;
+  }
+  if (isKrxMarketClosedDate_(snapshot.selectedDate || dateIso || todayIsoKst_(), getBoundaryHolidayDates_(snapshot.selectedDate || dateIso || todayIsoKst_()))) {
     return null;
   }
 
@@ -468,6 +479,9 @@ function loadLatestDashboardSnapshot_(dateIso, allowStale) {
 
 function saveDashboardSnapshot_(dateIso, codes, payload, source) {
   if (!payload || !payload.ok || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) {
+    return;
+  }
+  if (isKrxMarketClosedDate_(payload.selectedDate || dateIso, getBoundaryHolidayDates_(payload.selectedDate || dateIso))) {
     return;
   }
 
@@ -490,6 +504,11 @@ function clearLatestDashboardSnapshot_() {
 
 function shouldRunDashboardSnapshotTrigger_() {
   var now = new Date();
+  var today = todayIsoKst_();
+  if (isKrxMarketClosedDate_(today, getBoundaryHolidayDates_(today))) {
+    return false;
+  }
+
   var weekday = Number(Utilities.formatDate(now, PP_SHEET_GATEWAY.timezone, 'u'));
   if (weekday === 6 || weekday === 7) {
     return false;
@@ -532,7 +551,12 @@ function refreshDashboardSnapshot_(force) {
 
   try {
     var context = openDashboardContext_();
-    var dateIso = getSelectedDateIso_(context.controlSheet);
+    var currentDateIso = getSelectedDateIso_(context.controlSheet);
+    var dateIso = resolveKrxTradingDate_(currentDateIso);
+    if (dateIso !== currentDateIso) {
+      setSelectedDate_(context.controlSheet, dateIso);
+      waitForDashboardRefresh_(context, dateIso, null);
+    }
     var tickerCodes = getTickerCodes_(context.controlSheet);
     var payload = buildStableDashboardPayload_(context);
     saveDashboardPayloadCache_(payload.selectedDate || dateIso, tickerCodes, payload);
@@ -673,16 +697,17 @@ function buildDashboardPayload_(context) {
   var today = todayIsoKst_();
   var selectedDateIsToday = selectedDate === today;
   var tradingDates = readTradingDates_(context.indexSheet);
+  var marketHolidays = getBoundaryHolidayDates_(selectedDate);
   var tradingSet = {};
 
   for (var i = 0; i < tradingDates.length; i += 1) {
     tradingSet[tradingDates[i]] = true;
   }
 
-  var selectedDateIsWeekend = isWeekendIso_(selectedDate);
+  var selectedDateIsClosed = isKrxMarketClosedDate_(selectedDate, marketHolidays);
   var selectedDateIsKnownTradingDay = Boolean(tradingSet[selectedDate]);
   var allowLiveSelectedDate = selectedDateIsToday
-    && !selectedDateIsWeekend
+    && !selectedDateIsClosed
     && (!tradingDates.length || selectedDateIsKnownTradingDay);
 
   var slots = buildSlotPayloads_(values[0]);
@@ -692,6 +717,9 @@ function buildDashboardPayload_(context) {
   for (var rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
     var rowDateIso = coerceSheetDateToIso_(values[rowIndex][0]);
     if (!rowDateIso || rowDateIso.slice(0, 7) !== selectedDate.slice(0, 7)) {
+      continue;
+    }
+    if (isKrxMarketClosedDate_(rowDateIso, marketHolidays)) {
       continue;
     }
 
@@ -706,10 +734,7 @@ function buildDashboardPayload_(context) {
         display = formatPercent_(numeric);
       }
 
-      if (isFiniteNumber_(numeric)) {
-        totals[columnIndex - 1] += numeric;
-        hasValue = true;
-      } else if (display) {
+      if (isFiniteNumber_(numeric) || display) {
         hasValue = true;
       }
 
@@ -732,6 +757,12 @@ function buildDashboardPayload_(context) {
       continue;
     }
 
+    for (var totalIndex = 0; totalIndex < cells.length; totalIndex += 1) {
+      if (isFiniteNumber_(cells[totalIndex].value)) {
+        totals[totalIndex] += Number(cells[totalIndex].value);
+      }
+    }
+
     rows.push({
       date: rowDateIso,
       displayDate: formatMonthDay_(rowDateIso),
@@ -751,13 +782,14 @@ function buildDashboardPayload_(context) {
     spreadsheetTitle: context.spreadsheet.getName(),
     selectedDate: selectedDate,
     selectedDateLabel: formatHumanDate_(selectedDate),
-    selectedDateIsTradingDay: Boolean(tradingSet[selectedDate]) || (allowLiveSelectedDate && rows.some(function (row) {
+    selectedDateIsTradingDay: !selectedDateIsClosed && (Boolean(tradingSet[selectedDate]) || (allowLiveSelectedDate && rows.some(function (row) {
       return row.date === selectedDate;
-    })),
+    }))),
     today: today,
     lastTradingDate: lastTradingDate,
     lastTradingDateLabel: formatHumanDate_(lastTradingDate),
     tradingDateCount: tradingDates.length,
+    marketHolidays: marketHolidays,
     slots: slots,
     rows: rows,
     updatedAt: formatKstTimestamp_(new Date())
@@ -921,7 +953,7 @@ function handleEquityMonth_(params) {
   var stock = resolveStock_(params.ticker || params.q || '');
   var selectedDate = coerceIsoDate_(params.date);
   var monthStart = startOfMonthIso_(selectedDate);
-  var holidays = getMonthlyHolidayDates_(selectedDate);
+  var holidays = getKrxHolidayDates_(selectedDate);
   var boundaryHolidays = getBoundaryHolidayDates_(selectedDate);
   var historyEndDate = resolveSeriesEndDate_(selectedDate, boundaryHolidays);
   var rows = fetchDailyCloseRows_(stock.code, addDaysIso_(monthStart, -40), historyEndDate);
@@ -945,7 +977,7 @@ function handleIndexMonth_(params) {
   var stock = resolveIndexBenchmark_(params.indexCode || params.q || '0001');
   var selectedDate = coerceIsoDate_(params.date);
   var monthStart = startOfMonthIso_(selectedDate);
-  var holidays = getMonthlyHolidayDates_(selectedDate);
+  var holidays = getKrxHolidayDates_(selectedDate);
   var boundaryHolidays = getBoundaryHolidayDates_(selectedDate);
   var historyEndDate = resolveSeriesEndDate_(selectedDate, boundaryHolidays);
   var rows = fetchIndexDailyRows_(stock.code, historyEndDate);
@@ -968,7 +1000,7 @@ function handleIndexMonth_(params) {
 function handleIntradaySnapshot_(params) {
   var stock = resolveStock_(params.ticker || params.q || '');
   var selectedDate = coerceIsoDate_(params.date);
-  var holidays = getMonthlyHolidayDates_(selectedDate);
+  var holidays = getKrxHolidayDates_(selectedDate);
   var session = resolveGatewaySession_(selectedDate, holidays);
   var timestamp = formatKstTimestamp_(new Date());
 
@@ -1032,7 +1064,7 @@ function handleIntradaySnapshot_(params) {
 function handleIndexSnapshot_(params) {
   var stock = resolveIndexBenchmark_(params.indexCode || params.q || '0001');
   var selectedDate = coerceIsoDate_(params.date);
-  var holidays = getMonthlyHolidayDates_(selectedDate);
+  var holidays = getKrxHolidayDates_(selectedDate);
   var session = resolveGatewaySession_(selectedDate, holidays);
   var timestamp = formatKstTimestamp_(new Date());
 
@@ -1969,14 +2001,7 @@ function getMonthlyHolidayDates_(dateIso) {
     return cached.days;
   }
 
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
   try {
-    cached = loadCachedValue_(cacheKey);
-    if (cached && Array.isArray(cached.days)) {
-      return cached.days;
-    }
-
     var holidayRecords = fetchHolidayRecords_(isoToBasic_(dateIso));
     var days = holidayRecords
       .map(function (item) {
@@ -1996,8 +2021,9 @@ function getMonthlyHolidayDates_(dateIso) {
     var uniqueDays = uniqueStrings_(days).sort();
     saveCachedValue_(cacheKey, { days: uniqueDays }, STOCK_EQ_GATEWAY.holidayCacheHours);
     return uniqueDays;
-  } finally {
-    lock.releaseLock();
+  } catch (error) {
+    console.warn('holiday calendar fetch failed', error);
+    return [];
   }
 }
 
@@ -2234,7 +2260,7 @@ function resolveIndexPreviousClose_(quote) {
 function resolveGatewaySession_(selectedDate, holidays) {
   var today = todayIsoKst_();
   if (selectedDate !== today) return 'historical';
-  if (isWeekendIso_(selectedDate) || arrayContains_(holidays, selectedDate)) return 'holiday';
+  if (isKrxMarketClosedDate_(selectedDate, holidays)) return 'holiday';
 
   var timeText = Utilities.formatDate(new Date(), STOCK_EQ_GATEWAY.timezone, 'HH:mm');
   var parts = timeText.split(':');
@@ -2251,7 +2277,7 @@ function inferLastTradingDate_(selectedDate, monthStart, rows, holidays) {
 
   var cursor = selectedDate;
   while (cursor >= monthStart) {
-    if (!isWeekendIso_(cursor) && !arrayContains_(holidays, cursor)) {
+    if (!isKrxMarketClosedDate_(cursor, holidays)) {
       return cursor;
     }
     cursor = addDaysIso_(cursor, -1);
@@ -2261,7 +2287,48 @@ function inferLastTradingDate_(selectedDate, monthStart, rows, holidays) {
 
 function previousBusinessDateIso_(dateIso, holidays) {
   var cursor = addDaysIso_(dateIso, -1);
-  while (isWeekendIso_(cursor) || arrayContains_(holidays, cursor)) {
+  while (isKrxMarketClosedDate_(cursor, holidays)) {
+    cursor = addDaysIso_(cursor, -1);
+  }
+  return cursor;
+}
+
+function getKrxFixedMarketClosureDatesForMonth_(dateIso) {
+  var monthKey = String(dateIso || '').slice(0, 7);
+  var year = String(dateIso || '').slice(0, 4);
+  var dates = [
+    year + '-05-01',
+    year + '-12-31'
+  ];
+  return dates.filter(function (day) {
+    return day.indexOf(monthKey) === 0;
+  });
+}
+
+function getKrxHolidayDates_(dateIso) {
+  return uniqueStrings_(
+    getMonthlyHolidayDates_(dateIso).concat(getKrxFixedMarketClosureDatesForMonth_(dateIso))
+  ).sort();
+}
+
+function isKrxMarketClosedDate_(dateIso, holidays) {
+  if (!dateIso) return true;
+  if (isWeekendIso_(dateIso)) return true;
+  if (KRX_FIXED_MARKET_CLOSURE_MMDD[String(dateIso).slice(5)]) return true;
+  return arrayContains_(Array.isArray(holidays) ? holidays : getKrxHolidayDates_(dateIso), dateIso);
+}
+
+function resolveKrxTradingDate_(dateIso) {
+  var cursor = coerceIsoDate_(dateIso);
+  for (var guard = 0; guard < 370; guard += 1) {
+    if (isWeekendIso_(cursor) || KRX_FIXED_MARKET_CLOSURE_MMDD[String(cursor).slice(5)]) {
+      cursor = addDaysIso_(cursor, -1);
+      continue;
+    }
+
+    if (!arrayContains_(getBoundaryHolidayDates_(cursor), cursor)) {
+      return cursor;
+    }
     cursor = addDaysIso_(cursor, -1);
   }
   return cursor;
@@ -2270,12 +2337,12 @@ function previousBusinessDateIso_(dateIso, holidays) {
 function getBoundaryHolidayDates_(selectedDate) {
   var monthStart = startOfMonthIso_(selectedDate);
   var prevMonthDate = addDaysIso_(monthStart, -1);
-  return uniqueStrings_(getMonthlyHolidayDates_(selectedDate).concat(getMonthlyHolidayDates_(prevMonthDate))).sort();
+  return uniqueStrings_(getKrxHolidayDates_(selectedDate).concat(getKrxHolidayDates_(prevMonthDate))).sort();
 }
 
 function resolveSeriesEndDate_(selectedDate, holidays) {
   var session = resolveGatewaySession_(selectedDate, holidays);
-  if (session === 'preopen' || session === 'open' || session === 'holiday' || isWeekendIso_(selectedDate)) {
+  if (session === 'preopen' || session === 'open' || session === 'holiday' || isKrxMarketClosedDate_(selectedDate, holidays)) {
     return previousBusinessDateIso_(selectedDate, holidays);
   }
   return selectedDate;

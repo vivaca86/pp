@@ -2,6 +2,10 @@ const DEFAULT_SNAPSHOT_KEY = "dashboard-latest.json";
 const DEFAULT_FALLBACK_SNAPSHOT_URL = "https://vivaca86.github.io/pp/dashboard-latest.json";
 const DEFAULT_USAGE_LOG_RETENTION_DAYS = 90;
 const DEFAULT_USAGE_RECENT_LIMIT = 100;
+const KRX_FIXED_MARKET_CLOSURE_MMDD = new Set(["05-01", "12-31"]);
+const KRX_KNOWN_MARKET_CLOSURES = new Set([
+  "2026-05-01"
+]);
 const USAGE_EVENT_LABELS = {
   calculator_view: "계산기 열림",
   calculator_input: "계산기 입력",
@@ -13,6 +17,51 @@ const USAGE_EVENT_LABELS = {
   recommendation_run: "종목추천 실행",
   recommendation_add: "추천 종목 추가"
 };
+
+function isIsoDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+}
+
+function addDaysIso(dateText, offsetDays) {
+  const date = new Date(`${dateText}T12:00:00+09:00`);
+  date.setUTCDate(date.getUTCDate() + Number(offsetDays || 0));
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function isWeekendIso(dateText) {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    weekday: "short"
+  }).format(new Date(`${dateText}T12:00:00+09:00`));
+  return weekday === "Sat" || weekday === "Sun";
+}
+
+function isKrxMarketClosure(dateText) {
+  const normalized = String(dateText || "").trim();
+  if (!isIsoDate(normalized)) return true;
+  return KRX_FIXED_MARKET_CLOSURE_MMDD.has(normalized.slice(5))
+    || KRX_KNOWN_MARKET_CLOSURES.has(normalized);
+}
+
+function isKrxTradingDay(dateText) {
+  const normalized = String(dateText || "").trim();
+  return isIsoDate(normalized) && !isWeekendIso(normalized) && !isKrxMarketClosure(normalized);
+}
+
+function resolveKrxTradingDate(dateText) {
+  let cursor = String(dateText || "").trim();
+  if (!isIsoDate(cursor)) return "";
+  for (let guard = 0; guard < 370; guard += 1) {
+    if (isKrxTradingDay(cursor)) return cursor;
+    cursor = addDaysIso(cursor, -1);
+  }
+  return cursor;
+}
 
 function corsHeaders() {
   return {
@@ -453,6 +502,7 @@ function withEdgeMetadata(payload, source) {
 async function serveSnapshot(request, env) {
   const url = new URL(request.url);
   const requestedDate = String(url.searchParams.get("date") || "").trim();
+  const effectiveRequestedDate = requestedDate ? resolveKrxTradingDate(requestedDate) : "";
   const key = env.SNAPSHOT_KEY || DEFAULT_SNAPSHOT_KEY;
 
   const record = await readSnapshotFromKv(env, key)
@@ -485,11 +535,26 @@ async function serveSnapshot(request, env) {
     });
   }
 
-  if (requestedDate && payload.selectedDate !== requestedDate) {
+  if (!isKrxTradingDay(payload.selectedDate)) {
+    return jsonResponse({
+      ok: false,
+      error: "snapshot_market_holiday",
+      selectedDate: payload.selectedDate,
+      source: record.source
+    }, {
+      status: 404,
+      headers: {
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
+  if (effectiveRequestedDate && payload.selectedDate !== effectiveRequestedDate) {
     return jsonResponse({
       ok: false,
       error: "snapshot_date_mismatch",
       requestedDate,
+      effectiveRequestedDate,
       selectedDate: payload.selectedDate,
       source: record.source
     }, {

@@ -32,6 +32,10 @@ const DEFAULT_DASHBOARD_SNAPSHOT_URL = String(
   || "./dashboard-latest.json"
 ).trim();
 const DEFAULT_DASHBOARD_SOURCE_MODE = "api";
+const KRX_FIXED_MARKET_CLOSURE_MMDD = new Set(["05-01", "12-31"]);
+const KRX_KNOWN_MARKET_CLOSURES = new Set([
+  "2026-05-01"
+]);
 const recommendationWarmupState = {
   completedKeys: new Set(),
   pending: new Map()
@@ -220,6 +224,51 @@ function isWeekendIso(dateText) {
   }).format(parseKstDate(dateText));
 
   return weekday === "Sat" || weekday === "Sun";
+}
+
+function getKrxHolidaySet(extraDays = []) {
+  const days = new Set(KRX_KNOWN_MARKET_CLOSURES);
+  (Array.isArray(extraDays) ? extraDays : []).forEach((day) => {
+    const normalized = String(day || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) days.add(normalized);
+  });
+  return days;
+}
+
+function isKrxMarketClosure(dateText, extraDays = []) {
+  const normalized = String(dateText || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return true;
+  return KRX_FIXED_MARKET_CLOSURE_MMDD.has(normalized.slice(5))
+    || getKrxHolidaySet(extraDays).has(normalized);
+}
+
+function isKrxTradingDay(dateText, extraDays = []) {
+  const normalized = String(dateText || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return false;
+  return !isWeekendIso(normalized) && !isKrxMarketClosure(normalized, extraDays);
+}
+
+function getPreviousKrxTradingDay(dateText, extraDays = []) {
+  let cursor = String(dateText || getTodayKstDate()).trim();
+  for (let guard = 0; guard < 370; guard += 1) {
+    if (isKrxTradingDay(cursor, extraDays)) return cursor;
+    cursor = addDaysIso(cursor, -1);
+  }
+  return cursor;
+}
+
+function resolveDashboardRequestDate(dateText, extraDays = []) {
+  const requested = String(dateText || getTodayKstDate()).trim();
+  return isKrxTradingDay(requested, extraDays)
+    ? requested
+    : getPreviousKrxTradingDay(requested, extraDays);
+}
+
+function getPayloadHolidayDays(payload) {
+  return [
+    ...(Array.isArray(payload?.marketHolidays) ? payload.marketHolidays : []),
+    ...(Array.isArray(payload?.holidays) ? payload.holidays : [])
+  ];
 }
 
 function formatDisplayDate(dateText) {
@@ -1025,7 +1074,7 @@ function renderCachedDashboardIfAvailable(date) {
 }
 
 function deferDashboardLoadForDate(date) {
-  const nextDate = date || getTodayKstDate();
+  const nextDate = resolveDashboardRequestDate(date || getTodayKstDate());
   const previousDate = state.selectedDate;
 
   state.selectedDate = nextDate;
@@ -1546,7 +1595,7 @@ function applySnapshotToSeries(series, snapshot) {
 function resolveMarketSession(selectedDate, holidaySet = new Set()) {
   const today = getTodayKstDate();
   if (selectedDate !== today) return "historical";
-  if (isWeekendIso(selectedDate) || holidaySet.has(selectedDate)) return "holiday";
+  if (!isKrxTradingDay(selectedDate, [...holidaySet])) return "holiday";
 
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: MARKET_TIMEZONE,
@@ -1572,6 +1621,7 @@ function buildTableRows(seriesCollection) {
   });
 
   return [...dateSet]
+    .filter((date) => isKrxTradingDay(date, collectSeriesHolidayDays(seriesCollection)))
     .sort((left, right) => left.localeCompare(right))
     .map((date) => ({
       date,
@@ -1587,9 +1637,56 @@ function buildTableRows(seriesCollection) {
     }));
 }
 
+function collectSeriesHolidayDays(seriesCollection = []) {
+  const days = new Set();
+  seriesCollection.forEach((series) => {
+    (Array.isArray(series?.holidays) ? series.holidays : []).forEach((day) => {
+      const normalized = String(day || "").trim();
+      if (normalized) days.add(normalized);
+    });
+  });
+  return [...days];
+}
+
+function recalcDashboardSlotTotals(slots = [], rows = []) {
+  return (Array.isArray(slots) ? slots : []).map((slot, index) => ({
+    ...slot,
+    total: rows.reduce((sum, row) => {
+      const value = Number(row?.values?.[index]?.value);
+      return Number.isFinite(value) ? sum + value : sum;
+    }, 0)
+  }));
+}
+
+function normalizeDashboardTradingDays(payload) {
+  if (!payload || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) return payload;
+
+  const holidayDays = getPayloadHolidayDays(payload);
+  const rows = payload.rows.filter((row) => isKrxTradingDay(row?.date, holidayDays));
+  const selectedDate = String(payload.selectedDate || "").trim();
+  const lastTradingDate = rows.length
+    ? rows.map((row) => row.date).filter(Boolean).sort().pop()
+    : (selectedDate ? resolveDashboardRequestDate(selectedDate, holidayDays) : "");
+
+  return {
+    ...payload,
+    selectedDate: isKrxTradingDay(selectedDate, holidayDays) ? selectedDate : lastTradingDate,
+    lastTradingDate: lastTradingDate || payload.lastTradingDate,
+    rows,
+    slots: recalcDashboardSlotTotals(payload.slots, rows)
+  };
+}
+
 function buildDashboardPayload(seriesCollection, selectedDate) {
+  const marketHolidays = collectSeriesHolidayDays(seriesCollection);
+  const filteredSeriesCollection = seriesCollection.map((series) => ({
+    ...series,
+    rows: Array.isArray(series?.rows)
+      ? series.rows.filter((row) => isKrxTradingDay(row?.date, marketHolidays))
+      : []
+  }));
   const slots = getAllSlots().map((slot, index) => {
-    const series = seriesCollection[index];
+    const series = filteredSeriesCollection[index];
     const total = Array.isArray(series?.rows)
       ? series.rows.reduce((sum, row) => (
         Number.isFinite(row?.equalRate) ? sum + Number(row.equalRate) : sum
@@ -1601,12 +1698,12 @@ function buildDashboardPayload(seriesCollection, selectedDate) {
       total
     };
   });
-  const rows = buildTableRows(seriesCollection);
-  const sourceMode = seriesCollection.every((series) => !series.target || series.source === "gateway")
+  const rows = buildTableRows(filteredSeriesCollection);
+  const sourceMode = filteredSeriesCollection.every((series) => !series.target || series.source === "gateway")
     ? "gateway"
     : "demo";
 
-  const latestStamp = seriesCollection
+  const latestStamp = filteredSeriesCollection
     .map((series) => series.asOf)
     .filter(Boolean)
     .sort()
@@ -1618,6 +1715,7 @@ function buildDashboardPayload(seriesCollection, selectedDate) {
     session: state.session,
     sourceMode,
     updatedAt: latestStamp,
+    marketHolidays,
     slots,
     rows
   };
@@ -1776,7 +1874,7 @@ function renderMobileCompare(payload) {
 }
 
 function renderDashboard(payload, options = {}) {
-  payload = enrichDashboardPayload(normalizeDashboardPayloadAge(payload));
+  payload = enrichDashboardPayload(normalizeDashboardTradingDays(normalizeDashboardPayloadAge(payload)));
   state.dashboard = payload;
   state.dashboardFromCache = Boolean(options.fromCache);
   state.selectedDate = payload.selectedDate || state.selectedDate;
@@ -2468,7 +2566,8 @@ async function loadDashboardPayloadFromApi(date) {
 }
 
 async function loadDashboardPayloadFromStaticSnapshot(date) {
-  const snapshotUrl = buildDashboardSnapshotUrl(date);
+  const snapshotDate = resolveDashboardRequestDate(date);
+  const snapshotUrl = buildDashboardSnapshotUrl(snapshotDate);
   if (!snapshotUrl) return null;
 
   try {
@@ -2480,7 +2579,7 @@ async function loadDashboardPayloadFromStaticSnapshot(date) {
     if (!response.ok) return null;
 
     const payload = await response.json();
-    const requestedDate = String(date || "").trim();
+    const requestedDate = String(snapshotDate || "").trim();
     if (!payload?.ok || !Array.isArray(payload.rows) || !Array.isArray(payload.slots)) return null;
     if (requestedDate && payload.selectedDate !== requestedDate) return null;
 
@@ -2542,8 +2641,10 @@ async function loadDashboardPayloadWithRetry(date, maxAttempts = 3) {
 
 async function loadDashboard(date = getTodayKstDate(), options = {}) {
   const usageStartedAt = markUsageStart();
+  const requestedDate = String(date || getTodayKstDate()).trim();
+  const loadDate = resolveDashboardRequestDate(requestedDate);
   const previousDate = state.selectedDate;
-  if (previousDate && previousDate !== date) {
+  if (previousDate && previousDate !== loadDate) {
     setRecommendationState({
       items: [],
       loading: false,
@@ -2551,17 +2652,22 @@ async function loadDashboard(date = getTodayKstDate(), options = {}) {
     });
   }
 
-  state.selectedDate = date;
-  localStorage.setItem(STORAGE_LAST_DATE, date);
-  const renderedCachedPayload = options.useCache !== false && renderCachedDashboardIfAvailable(date);
+  state.selectedDate = loadDate;
+  localStorage.setItem(STORAGE_LAST_DATE, loadDate);
+  const renderedCachedPayload = options.useCache !== false && renderCachedDashboardIfAvailable(loadDate);
   state.loading = true;
   setBusyState(true);
   if (!renderedCachedPayload) {
-    setStatus("월간표를 불러오는 중...", "loading");
+    setStatus(
+      requestedDate !== loadDate
+        ? `${requestedDate}은(는) 휴장일이라 ${loadDate} 기준 월간표를 불러오는 중...`
+        : "월간표를 불러오는 중...",
+      "loading"
+    );
   }
 
   try {
-    const payload = await loadDashboardPayloadWithRetry(date);
+    const payload = await loadDashboardPayloadWithRetry(loadDate);
     const staticPayload = isStaticDashboardPayload(payload);
     renderDashboard(payload);
     state.lastDashboardLoadedAt = Date.now();
@@ -2570,32 +2676,39 @@ async function loadDashboard(date = getTodayKstDate(), options = {}) {
     }
     if (!staticPayload) {
       scheduleCatalogLoad();
-      loadSnapshotStatus(payload.selectedDate || date).catch(() => {});
+      loadSnapshotStatus(payload.selectedDate || loadDate).catch(() => {});
       trackUsage("dashboard_load", {
         view: "dashboard",
-        selectedDate: payload.selectedDate || date,
+        selectedDate: payload.selectedDate || loadDate,
         success: true,
         durationMs: usageDurationSince(usageStartedAt),
-        metadata: buildDashboardUsageMetadata(payload, staticPayload ? "snapshot" : getDashboardSourceMode())
+        metadata: {
+          ...buildDashboardUsageMetadata(payload, staticPayload ? "snapshot" : getDashboardSourceMode()),
+          requestedDate
+        }
       });
     }
     if (staticPayload) {
       trackUsage("dashboard_load", {
         view: "dashboard",
-        selectedDate: payload.selectedDate || date,
+        selectedDate: payload.selectedDate || loadDate,
         success: true,
         durationMs: usageDurationSince(usageStartedAt),
-        metadata: buildDashboardUsageMetadata(payload, "snapshot")
+        metadata: {
+          ...buildDashboardUsageMetadata(payload, "snapshot"),
+          requestedDate
+        }
       });
     }
     setStatus("업데이트 완료", "success");
   } catch (error) {
     trackUsage("dashboard_load", {
       view: "dashboard",
-      selectedDate: date,
+      selectedDate: loadDate,
       success: false,
       durationMs: usageDurationSince(usageStartedAt),
       metadata: {
+        requestedDate,
         reason: String(error?.code || error?.message || "dashboard_load_failed").slice(0, 48)
       }
     });
@@ -2716,9 +2829,9 @@ function renderRecommendationResults() {
 
 function restoreState() {
   const today = getTodayKstDate();
-  state.selectedDate = today;
+  state.selectedDate = resolveDashboardRequestDate(today);
   state.activeView = "calculator";
-  localStorage.setItem(STORAGE_LAST_DATE, today);
+  localStorage.setItem(STORAGE_LAST_DATE, state.selectedDate);
   localStorage.setItem(STORAGE_ACTIVE_VIEW, state.activeView);
   elements.dateInput.value = state.selectedDate;
   elements.dateInput.max = today;
