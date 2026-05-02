@@ -1,0 +1,30 @@
+name: Upload Dashboard Snapshot
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/upload-dashboard-snapshot.yml"
+      - ".github/scripts/upload-dashboard-snapshot-to-kv.mjs"
+      - "dashboard-latest.json"
+
+jobs:
+  upload-dashboard-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Upload snapshot to Cloudflare KV
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_KV_NAMESPACE_ID: ${{ secrets.CLOUDFLARE_KV_NAMESPACE_ID }}
+        run: node .github/scripts/upload-dashboard-snapshot-to-kv.mjs

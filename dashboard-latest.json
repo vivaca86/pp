@@ -2,27 +2,27 @@
   "ok": true,
   "service": "pp-sheet-gateway",
   "spreadsheetTitle": "주식",
-  "selectedDate": "2026-05-01",
-  "selectedDateLabel": "2026.05.01",
+  "selectedDate": "2026-04-30",
+  "selectedDateLabel": "2026.04.30",
   "selectedDateIsTradingDay": true,
-  "today": "2026-05-01",
-  "lastTradingDate": "2026-05-01",
-  "lastTradingDateLabel": "2026.05.01",
-  "tradingDateCount": 0,
+  "today": "2026-05-02",
+  "lastTradingDate": "2026-04-30",
+  "lastTradingDateLabel": "2026.04.30",
+  "tradingDateCount": 22,
   "slots": [
     {
       "editable": false,
       "code": "KOSPI",
       "name": "코스피",
       "market": "KOSPI",
-      "total": 0
+      "total": 0.34776385
     },
     {
       "editable": false,
       "code": "KOSDAQ",
       "name": "코스닥",
       "market": "KOSDAQ",
-      "total": 0
+      "total": 0.13126197
     },
     {
       "id": 1,
@@ -39,7 +39,7 @@
       "code": "213420",
       "name": "덕산네오룩스",
       "market": "KOSDAQ",
-      "total": 0,
+      "total": 0.36392578,
       "assetType": "stock"
     },
     {
@@ -48,7 +48,7 @@
       "code": "042700",
       "name": "한미반도체",
       "market": "KOSPI",
-      "total": 0,
+      "total": 0.43481444,
       "assetType": "stock"
     },
     {
@@ -57,7 +57,7 @@
       "code": "319660",
       "name": "피에스케이",
       "market": "KOSDAQ",
-      "total": 0,
+      "total": -0.00116967,
       "assetType": "stock"
     },
     {
@@ -75,56 +75,854 @@
       "code": "005930",
       "name": "삼성전자",
       "market": "KOSPI",
-      "total": 0,
+      "total": 0.34343865,
       "assetType": "stock"
     }
   ],
   "rows": [
     {
-      "date": "2026-05-01",
-      "displayDate": "05-01",
+      "date": "2026-04-30",
+      "displayDate": "04-30",
       "values": [
         {
-          "value": 0,
-          "display": "0.00%"
+          "value": -0.0137545,
+          "display": "-1.38%"
         },
         {
-          "value": 0,
-          "display": "0.00%"
-        },
-        {
-          "value": null,
-          "display": "-"
-        },
-        {
-          "value": 0,
-          "display": "0.00%"
-        },
-        {
-          "value": 0,
-          "display": "0.00%"
-        },
-        {
-          "value": 0,
-          "display": "0.00%"
+          "value": -0.02287217,
+          "display": "-2.29%"
         },
         {
           "value": null,
           "display": "-"
         },
         {
+          "value": -0.03992395,
+          "display": "-3.99%"
+        },
+        {
+          "value": 0.02937063,
+          "display": "2.94%"
+        },
+        {
+          "value": -0.04930332,
+          "display": "-4.93%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.02433628,
+          "display": "-2.43%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-29",
+      "displayDate": "04-29",
+      "values": [
+        {
+          "value": 0.00751089,
+          "display": "0.75%"
+        },
+        {
+          "value": 0.00385001,
+          "display": "0.39%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.00754717,
+          "display": "-0.75%"
+        },
+        {
+          "value": -0.02588556,
+          "display": "-2.59%"
+        },
+        {
+          "value": -0.00213904,
+          "display": "-0.21%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.01801802,
+          "display": "1.80%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-28",
+      "displayDate": "04-28",
+      "values": [
+        {
+          "value": 0.00392893,
+          "display": "0.39%"
+        },
+        {
+          "value": -0.00864473,
+          "display": "-0.86%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.02214022,
+          "display": "-2.21%"
+        },
+        {
+          "value": -0.01740295,
+          "display": "-1.74%"
+        },
+        {
+          "value": 0.01630435,
+          "display": "1.63%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.01113586,
+          "display": "-1.11%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-27",
+      "displayDate": "04-27",
+      "values": [
+        {
+          "value": 0.02152686,
+          "display": "2.15%"
+        },
+        {
+          "value": 0.01855728,
+          "display": "1.86%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.02071563,
+          "display": "2.07%"
+        },
+        {
+          "value": 0.26395939,
+          "display": "26.40%"
+        },
+        {
+          "value": -0.01075269,
+          "display": "-1.08%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.02277904,
+          "display": "2.28%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-24",
+      "displayDate": "04-24",
+      "values": [
+        {
+          "value": -0.0000278,
+          "display": "0.00%"
+        },
+        {
+          "value": 0.02514668,
+          "display": "2.51%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.04117647,
+          "display": "4.12%"
+        },
+        {
+          "value": 0.00681431,
+          "display": "0.68%"
+        },
+        {
+          "value": 0.06773823,
+          "display": "6.77%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.02227171,
+          "display": "-2.23%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-23",
+      "displayDate": "04-23",
+      "values": [
+        {
+          "value": 0.00901848,
+          "display": "0.90%"
+        },
+        {
+          "value": -0.00576571,
+          "display": "-0.58%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.04315197,
+          "display": "-4.32%"
+        },
+        {
           "value": 0,
           "display": "0.00%"
+        },
+        {
+          "value": 0.0023015,
+          "display": "0.23%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.03218391,
+          "display": "3.22%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-22",
+      "displayDate": "04-22",
+      "values": [
+        {
+          "value": 0.00461143,
+          "display": "0.46%"
+        },
+        {
+          "value": 0.00177264,
+          "display": "0.18%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.01330798,
+          "display": "1.33%"
+        },
+        {
+          "value": -0.00508475,
+          "display": "-0.51%"
+        },
+        {
+          "value": 0.03823178,
+          "display": "3.82%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.00684932,
+          "display": "-0.68%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-21",
+      "displayDate": "04-21",
+      "values": [
+        {
+          "value": 0.0272355,
+          "display": "2.72%"
+        },
+        {
+          "value": 0.0035579,
+          "display": "0.36%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.01865672,
+          "display": "-1.87%"
+        },
+        {
+          "value": 0.02787456,
+          "display": "2.79%"
+        },
+        {
+          "value": 0.01948843,
+          "display": "1.95%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.02097902,
+          "display": "2.10%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-20",
+      "displayDate": "04-20",
+      "values": [
+        {
+          "value": 0.00438798,
+          "display": "0.44%"
+        },
+        {
+          "value": 0.00411097,
+          "display": "0.41%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.03942652,
+          "display": "-3.94%"
+        },
+        {
+          "value": 0.0017452,
+          "display": "0.17%"
+        },
+        {
+          "value": -0.03069658,
+          "display": "-3.07%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.00694444,
+          "display": "-0.69%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-17",
+      "displayDate": "04-17",
+      "values": [
+        {
+          "value": -0.00548181,
+          "display": "-0.55%"
+        },
+        {
+          "value": 0.00607926,
+          "display": "0.61%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.00722022,
+          "display": "0.72%"
+        },
+        {
+          "value": -0.01883562,
+          "display": "-1.88%"
+        },
+        {
+          "value": -0.05044843,
+          "display": "-5.04%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.00689655,
+          "display": "-0.69%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-16",
+      "displayDate": "04-16",
+      "values": [
+        {
+          "value": 0.02210661,
+          "display": "2.21%"
+        },
+        {
+          "value": 0.00914589,
+          "display": "0.91%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.09055118,
+          "display": "9.06%"
+        },
+        {
+          "value": -0.01016949,
+          "display": "-1.02%"
+        },
+        {
+          "value": 0.01019253,
+          "display": "1.02%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.03080569,
+          "display": "3.08%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-15",
+      "displayDate": "04-15",
+      "values": [
+        {
+          "value": 0.02071803,
+          "display": "2.07%"
+        },
+        {
+          "value": 0.02723108,
+          "display": "2.72%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.00395257,
+          "display": "0.40%"
+        },
+        {
+          "value": 0.03873239,
+          "display": "3.87%"
+        },
+        {
+          "value": 0.08343558,
+          "display": "8.34%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.02179177,
+          "display": "2.18%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "displayDate": "04-14",
+      "values": [
+        {
+          "value": 0.02739549,
+          "display": "2.74%"
+        },
+        {
+          "value": 0.02003928,
+          "display": "2.00%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.04166667,
+          "display": "-4.17%"
+        },
+        {
+          "value": 0.02712477,
+          "display": "2.71%"
+        },
+        {
+          "value": -0.02278177,
+          "display": "-2.28%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.02736318,
+          "display": "2.74%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-13",
+      "displayDate": "04-13",
+      "values": [
+        {
+          "value": -0.00857674,
+          "display": "-0.86%"
+        },
+        {
+          "value": 0.00567834,
+          "display": "0.57%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.01123596,
+          "display": "-1.12%"
+        },
+        {
+          "value": -0.03321678,
+          "display": "-3.32%"
+        },
+        {
+          "value": 0.02205882,
+          "display": "2.21%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.02427184,
+          "display": "-2.43%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-10",
+      "displayDate": "04-10",
+      "values": [
+        {
+          "value": 0.01399444,
+          "display": "1.40%"
+        },
+        {
+          "value": 0.01638476,
+          "display": "1.64%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.13135593,
+          "display": "13.14%"
+        },
+        {
+          "value": 0,
+          "display": "0.00%"
+        },
+        {
+          "value": -0.02040816,
+          "display": "-2.04%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.00980392,
+          "display": "0.98%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-09",
+      "displayDate": "04-09",
+      "values": [
+        {
+          "value": -0.01606344,
+          "display": "-1.61%"
+        },
+        {
+          "value": -0.01270817,
+          "display": "-1.27%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.05948373,
+          "display": "5.95%"
+        },
+        {
+          "value": 0.01960784,
+          "display": "1.96%"
+        },
+        {
+          "value": -0.0188457,
+          "display": "-1.88%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.03087886,
+          "display": "-3.09%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-08",
+      "displayDate": "04-08",
+      "values": [
+        {
+          "value": 0.06871249,
+          "display": "6.87%"
+        },
+        {
+          "value": 0.05123803,
+          "display": "5.12%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.06451613,
+          "display": "6.45%"
+        },
+        {
+          "value": 0.10650888,
+          "display": "10.65%"
+        },
+        {
+          "value": 0.09266409,
+          "display": "9.27%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.07124682,
+          "display": "7.12%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-07",
+      "displayDate": "04-07",
+      "values": [
+        {
+          "value": 0.00815547,
+          "display": "0.82%"
+        },
+        {
+          "value": -0.01015878,
+          "display": "-1.02%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.04123711,
+          "display": "-4.12%"
+        },
+        {
+          "value": 0.00595238,
+          "display": "0.60%"
+        },
+        {
+          "value": 0.02642008,
+          "display": "2.64%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.01760746,
+          "display": "1.76%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-06",
+      "displayDate": "04-06",
+      "values": [
+        {
+          "value": 0.01358117,
+          "display": "1.36%"
+        },
+        {
+          "value": -0.01539835,
+          "display": "-1.54%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.004561,
+          "display": "-0.46%"
+        },
+        {
+          "value": -0.03076923,
+          "display": "-3.08%"
+        },
+        {
+          "value": -0.00394737,
+          "display": "-0.39%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.03705693,
+          "display": "3.71%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-03",
+      "displayDate": "04-03",
+      "values": [
+        {
+          "value": 0.02736886,
+          "display": "2.74%"
+        },
+        {
+          "value": 0.00701479,
+          "display": "0.70%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.01460674,
+          "display": "-1.46%"
+        },
+        {
+          "value": 0.015625,
+          "display": "1.56%"
+        },
+        {
+          "value": -0.06403941,
+          "display": "-6.40%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.04372197,
+          "display": "4.37%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-02",
+      "displayDate": "04-02",
+      "values": [
+        {
+          "value": -0.04465475,
+          "display": "-4.47%"
+        },
+        {
+          "value": -0.05361142,
+          "display": "-5.36%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.10552764,
+          "display": "-10.55%"
+        },
+        {
+          "value": -0.06398537,
+          "display": "-6.40%"
+        },
+        {
+          "value": -0.06666667,
+          "display": "-6.67%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.0593198,
+          "display": "-5.93%"
+        }
+      ]
+    },
+    {
+      "date": "2026-04-01",
+      "displayDate": "04-01",
+      "values": [
+        {
+          "value": 0.08436286,
+          "display": "8.44%"
+        },
+        {
+          "value": 0.06061441,
+          "display": "6.06%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": -0.00896414,
+          "display": "-0.90%"
+        },
+        {
+          "value": 0.08964143,
+          "display": "8.96%"
+        },
+        {
+          "value": 0.09433962,
+          "display": "9.43%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.13427033,
+          "display": "13.43%"
         }
       ]
     }
   ],
-  "updatedAt": "2026-05-01T15:40:16+09:00",
-  "snapshotUpdatedAt": "2026-05-01T15:40:16+09:00",
-  "snapshotAgeSeconds": 125,
-  "snapshotSource": "trigger",
+  "updatedAt": "2026-05-02T09:49:27+09:00",
+  "snapshotUpdatedAt": "2026-05-02T09:49:27+09:00",
+  "snapshotAgeSeconds": 1,
+  "snapshotSource": "request",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-05-01T06:42:21.922Z",
+  "staticPublishedAt": "2026-05-02T00:49:27.105Z",
   "staticGenerator": "github-actions"
 }
