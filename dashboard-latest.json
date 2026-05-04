@@ -18,7 +18,7 @@
       "code": "KOSPI",
       "name": "코스피",
       "market": "KOSPI",
-      "total": 0.03983106
+      "total": 0.04879775
     },
     {
       "editable": false,
@@ -42,7 +42,7 @@
       "code": "213420",
       "name": "덕산네오룩스",
       "market": "KOSDAQ",
-      "total": 0.03762376,
+      "total": 0.04752475,
       "assetType": "stock"
     },
     {
@@ -51,7 +51,7 @@
       "code": "042700",
       "name": "한미반도체",
       "market": "KOSPI",
-      "total": 0.02309783,
+      "total": 0.01766304,
       "assetType": "stock"
     },
     {
@@ -60,7 +60,7 @@
       "code": "319660",
       "name": "피에스케이",
       "market": "KOSDAQ",
-      "total": 0.10822999,
+      "total": 0.12852311,
       "assetType": "stock"
     },
     {
@@ -78,7 +78,7 @@
       "code": "373220",
       "name": "373220",
       "market": "KRX",
-      "total": 0.02062975
+      "total": 0.02497286
     }
   ],
   "rows": [
@@ -87,8 +87,8 @@
       "displayDate": "05-04",
       "values": [
         {
-          "value": 0.03983106,
-          "display": "3.98%"
+          "value": 0.04879775,
+          "display": "4.88%"
         },
         {
           "value": 0,
@@ -99,34 +99,34 @@
           "display": "-"
         },
         {
-          "value": 0.03762376,
-          "display": "3.76%"
+          "value": 0.04752475,
+          "display": "4.75%"
         },
         {
-          "value": 0.02309783,
-          "display": "2.31%"
+          "value": 0.01766304,
+          "display": "1.77%"
         },
         {
-          "value": 0.10822999,
-          "display": "10.82%"
+          "value": 0.12852311,
+          "display": "12.85%"
         },
         {
           "value": null,
           "display": "-"
         },
         {
-          "value": 0.02062975,
-          "display": "2.06%"
+          "value": 0.02497286,
+          "display": "2.50%"
         }
       ]
     }
   ],
-  "updatedAt": "2026-05-04T12:50:44+09:00",
-  "snapshotUpdatedAt": "2026-05-04T12:50:44+09:00",
-  "snapshotAgeSeconds": 32,
+  "updatedAt": "2026-05-04T15:35:19+09:00",
+  "snapshotUpdatedAt": "2026-05-04T15:35:19+09:00",
+  "snapshotAgeSeconds": 25,
   "snapshotSource": "trigger",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-05-04T03:51:37.526Z",
+  "staticPublishedAt": "2026-05-04T06:36:05.140Z",
   "staticGenerator": "github-actions"
 }
