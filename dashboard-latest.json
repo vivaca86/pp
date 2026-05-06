@@ -10,16 +10,7 @@
   "lastTradingDateLabel": "2026.05.04",
   "tradingDateCount": 1,
   "marketHolidays": [
-    "2026-05-01",
-    "2026-05-09",
-    "2026-05-10",
-    "2026-05-16",
-    "2026-05-17",
-    "2026-05-23",
-    "2026-05-24",
-    "2026-05-25",
-    "2026-05-30",
-    "2026-05-31"
+    "2026-05-01"
   ],
   "slots": [
     {
@@ -130,12 +121,12 @@
       ]
     }
   ],
-  "updatedAt": "2026-05-06T12:46:04+09:00",
-  "snapshotUpdatedAt": "2026-05-06T12:46:04+09:00",
-  "snapshotAgeSeconds": 83,
+  "updatedAt": "2026-05-06T15:22:28+09:00",
+  "snapshotUpdatedAt": "2026-05-06T15:22:28+09:00",
+  "snapshotAgeSeconds": 10,
   "snapshotSource": "trigger",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-05-06T03:47:54.917Z",
+  "staticPublishedAt": "2026-05-06T06:22:58.776Z",
   "staticGenerator": "github-actions"
 }
