@@ -463,12 +463,12 @@
       ]
     }
   ],
-  "updatedAt": "2026-05-19T13:08:38+09:00",
-  "snapshotUpdatedAt": "2026-05-19T13:08:38+09:00",
-  "snapshotAgeSeconds": 56,
+  "updatedAt": "2026-05-19T15:41:13+09:00",
+  "snapshotUpdatedAt": "2026-05-19T15:41:13+09:00",
+  "snapshotAgeSeconds": 4557,
   "snapshotSource": "trigger",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-05-19T04:09:54.292Z",
+  "staticPublishedAt": "2026-05-19T07:57:31.331Z",
   "staticGenerator": "github-actions"
 }
