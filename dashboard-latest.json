@@ -613,12 +613,12 @@
       ]
     }
   ],
-  "updatedAt": "2026-07-22T15:08:13+09:00",
-  "snapshotUpdatedAt": "2026-07-22T15:08:13+09:00",
-  "snapshotAgeSeconds": 37,
+  "updatedAt": "2026-07-22T15:41:16+09:00",
+  "snapshotUpdatedAt": "2026-07-22T15:41:16+09:00",
+  "snapshotAgeSeconds": 7427,
   "snapshotSource": "trigger",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-07-22T06:09:11.885Z",
+  "staticPublishedAt": "2026-07-22T08:45:22.602Z",
   "staticGenerator": "github-actions"
 }
