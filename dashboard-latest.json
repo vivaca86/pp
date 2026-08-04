@@ -2,28 +2,38 @@
   "ok": true,
   "service": "pp-sheet-gateway",
   "spreadsheetTitle": "주식",
-  "selectedDate": "2026-08-03",
-  "selectedDateLabel": "2026.08.03",
-  "selectedDateIsTradingDay": true,
-  "today": "2026-08-03",
+  "selectedDate": "2026-08-04",
+  "selectedDateLabel": "2026.08.04",
+  "selectedDateIsTradingDay": false,
+  "today": "2026-08-04",
   "lastTradingDate": "2026-08-03",
   "lastTradingDateLabel": "2026.08.03",
-  "tradingDateCount": 0,
-  "marketHolidays": [],
+  "tradingDateCount": 1,
+  "marketHolidays": [
+    "2026-08-08",
+    "2026-08-09",
+    "2026-08-15",
+    "2026-08-16",
+    "2026-08-17",
+    "2026-08-22",
+    "2026-08-23",
+    "2026-08-29",
+    "2026-08-30"
+  ],
   "slots": [
     {
       "editable": false,
       "code": "KOSPI",
       "name": "코스피",
       "market": "KOSPI",
-      "total": -0.04794669
+      "total": -0.05124745
     },
     {
       "editable": false,
       "code": "KOSDAQ",
       "name": "코스닥",
       "market": "KOSDAQ",
-      "total": 0
+      "total": 0.0244387
     },
     {
       "id": 1,
@@ -31,7 +41,7 @@
       "code": "0183V0",
       "name": "KIWOOM 삼성전자&SK하이닉스채권혼합50",
       "market": "KOSPI",
-      "total": -0.05291667,
+      "total": -0.055,
       "assetType": "etf"
     },
     {
@@ -40,7 +50,7 @@
       "code": "213420",
       "name": "덕산네오룩스",
       "market": "KOSDAQ",
-      "total": -0.00166667,
+      "total": -0.01166667,
       "assetType": "stock"
     },
     {
@@ -49,7 +59,7 @@
       "code": "042700",
       "name": "한미반도체",
       "market": "KOSPI",
-      "total": -0.05361305,
+      "total": -0.05594406,
       "assetType": "stock"
     },
     {
@@ -58,7 +68,7 @@
       "code": "319660",
       "name": "피에스케이",
       "market": "KOSDAQ",
-      "total": -0.00154321,
+      "total": -0.0316358,
       "assetType": "stock"
     },
     {
@@ -76,7 +86,7 @@
       "code": "373220",
       "name": "373220",
       "market": "KRX",
-      "total": -0.04268293
+      "total": -0.03658537
     }
   ],
   "rows": [
@@ -85,46 +95,46 @@
       "displayDate": "08-03",
       "values": [
         {
-          "value": -0.04794669,
-          "display": "-4.79%"
+          "value": -0.05124745,
+          "display": "-5.12%"
         },
         {
-          "value": 0,
-          "display": "0.00%"
+          "value": 0.0244387,
+          "display": "2.44%"
         },
         {
-          "value": -0.05291667,
-          "display": "-5.29%"
+          "value": -0.055,
+          "display": "-5.50%"
         },
         {
-          "value": -0.00166667,
-          "display": "-0.17%"
+          "value": -0.01166667,
+          "display": "-1.17%"
         },
         {
-          "value": -0.05361305,
-          "display": "-5.36%"
+          "value": -0.05594406,
+          "display": "-5.59%"
         },
         {
-          "value": -0.00154321,
-          "display": "-0.15%"
+          "value": -0.0316358,
+          "display": "-3.16%"
         },
         {
           "value": null,
           "display": "-"
         },
         {
-          "value": -0.04268293,
-          "display": "-4.27%"
+          "value": -0.03658537,
+          "display": "-3.66%"
         }
       ]
     }
   ],
-  "updatedAt": "2026-08-03T15:41:15+09:00",
-  "snapshotUpdatedAt": "2026-08-03T15:41:15+09:00",
-  "snapshotAgeSeconds": 305,
-  "snapshotSource": "trigger",
+  "updatedAt": "2026-08-04T10:46:30+09:00",
+  "snapshotUpdatedAt": "2026-08-04T10:46:30+09:00",
+  "snapshotAgeSeconds": 1,
+  "snapshotSource": "request",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-08-03T06:46:45.735Z",
+  "staticPublishedAt": "2026-08-04T01:46:31.407Z",
   "staticGenerator": "github-actions"
 }
