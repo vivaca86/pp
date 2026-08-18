@@ -2,15 +2,14 @@
   "ok": true,
   "service": "pp-sheet-gateway",
   "spreadsheetTitle": "주식",
-  "selectedDate": "2026-08-17",
-  "selectedDateLabel": "2026.08.17",
+  "selectedDate": "2026-08-18",
+  "selectedDateLabel": "2026.08.18",
   "selectedDateIsTradingDay": false,
-  "today": "2026-08-17",
+  "today": "2026-08-18",
   "lastTradingDate": "2026-08-14",
   "lastTradingDateLabel": "2026.08.14",
   "tradingDateCount": 10,
   "marketHolidays": [
-    "2026-08-17",
     "2026-08-22",
     "2026-08-23",
     "2026-08-29",
@@ -467,12 +466,12 @@
       ]
     }
   ],
-  "updatedAt": "2026-08-17T16:40:18+09:00",
-  "snapshotUpdatedAt": "2026-08-17T16:40:18+09:00",
-  "snapshotAgeSeconds": 1,
-  "snapshotSource": "request",
+  "updatedAt": "2026-08-18T10:36:57+09:00",
+  "snapshotUpdatedAt": "2026-08-18T10:36:57+09:00",
+  "snapshotAgeSeconds": 4,
+  "snapshotSource": "trigger",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-08-17T07:40:19.688Z",
+  "staticPublishedAt": "2026-08-18T01:37:32.883Z",
   "staticGenerator": "github-actions"
 }
