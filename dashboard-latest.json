@@ -2,13 +2,13 @@
   "ok": true,
   "service": "pp-sheet-gateway",
   "spreadsheetTitle": "주식",
-  "selectedDate": "2026-08-24",
-  "selectedDateLabel": "2026.08.24",
+  "selectedDate": "2026-08-25",
+  "selectedDateLabel": "2026.08.25",
   "selectedDateIsTradingDay": false,
-  "today": "2026-08-24",
-  "lastTradingDate": "2026-08-21",
-  "lastTradingDateLabel": "2026.08.21",
-  "tradingDateCount": 14,
+  "today": "2026-08-25",
+  "lastTradingDate": "2026-08-24",
+  "lastTradingDateLabel": "2026.08.24",
+  "tradingDateCount": 15,
   "marketHolidays": [
     "2026-08-29",
     "2026-08-30"
@@ -19,14 +19,14 @@
       "code": "KOSPI",
       "name": "코스피",
       "market": "KOSPI",
-      "total": 0.05549339
+      "total": 0.02424913
     },
     {
       "editable": false,
       "code": "KOSDAQ",
       "name": "코스닥",
       "market": "KOSDAQ",
-      "total": 0.11471896
+      "total": 0.12892202
     },
     {
       "id": 1,
@@ -34,7 +34,7 @@
       "code": "0183V0",
       "name": "KIWOOM 삼성전자&SK하이닉스채권혼합50",
       "market": "KOSPI",
-      "total": 0.00677143,
+      "total": -0.0219666,
       "assetType": "etf"
     },
     {
@@ -43,7 +43,7 @@
       "code": "213420",
       "name": "덕산네오룩스",
       "market": "KOSDAQ",
-      "total": 0.0702375,
+      "total": 0.06552792,
       "assetType": "stock"
     },
     {
@@ -52,7 +52,7 @@
       "code": "042700",
       "name": "한미반도체",
       "market": "KOSPI",
-      "total": 0.00534718,
+      "total": -0.0157301,
       "assetType": "stock"
     },
     {
@@ -61,7 +61,7 @@
       "code": "319660",
       "name": "피에스케이",
       "market": "KOSDAQ",
-      "total": -0.04662116,
+      "total": -0.02125291,
       "assetType": "stock"
     },
     {
@@ -79,10 +79,48 @@
       "code": "373220",
       "name": "373220",
       "market": "KRX",
-      "total": 0.05263384
+      "total": 0.10649119
     }
   ],
   "rows": [
+    {
+      "date": "2026-08-24",
+      "displayDate": "08-24",
+      "values": [
+        {
+          "value": -0.03124426,
+          "display": "-3.12%"
+        },
+        {
+          "value": 0.01420306,
+          "display": "1.42%"
+        },
+        {
+          "value": -0.02873803,
+          "display": "-2.87%"
+        },
+        {
+          "value": -0.00470958,
+          "display": "-0.47%"
+        },
+        {
+          "value": -0.02107728,
+          "display": "-2.11%"
+        },
+        {
+          "value": 0.02536825,
+          "display": "2.54%"
+        },
+        {
+          "value": null,
+          "display": "-"
+        },
+        {
+          "value": 0.05385735,
+          "display": "5.39%"
+        }
+      ]
+    },
     {
       "date": "2026-08-21",
       "displayDate": "08-21",
@@ -616,12 +654,12 @@
       ]
     }
   ],
-  "updatedAt": "2026-08-24T11:06:12+09:00",
-  "snapshotUpdatedAt": "2026-08-24T11:06:12+09:00",
-  "snapshotAgeSeconds": 18680,
+  "updatedAt": "2026-08-25T10:37:15+09:00",
+  "snapshotUpdatedAt": "2026-08-25T10:37:15+09:00",
+  "snapshotAgeSeconds": 67,
   "snapshotSource": "trigger",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-08-24T07:17:52.269Z",
+  "staticPublishedAt": "2026-08-25T01:38:42.197Z",
   "staticGenerator": "github-actions"
 }
