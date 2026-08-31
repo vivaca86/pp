@@ -803,12 +803,12 @@
       ]
     }
   ],
-  "updatedAt": "2026-08-31T13:56:13+09:00",
-  "snapshotUpdatedAt": "2026-08-31T13:56:13+09:00",
-  "snapshotAgeSeconds": 151,
+  "updatedAt": "2026-08-31T15:41:13+09:00",
+  "snapshotUpdatedAt": "2026-08-31T15:41:13+09:00",
+  "snapshotAgeSeconds": 17463,
   "snapshotSource": "trigger",
   "sourceMode": "static-snapshot",
   "staticSnapshot": true,
-  "staticPublishedAt": "2026-08-31T04:59:04.607Z",
+  "staticPublishedAt": "2026-08-31T11:32:38.162Z",
   "staticGenerator": "github-actions"
 }
